@@ -26,6 +26,9 @@ export interface CartonCloudPO {
   warehouseName: string;
 }
 
+// Custom field values stored as key-value pairs
+export type CustomFieldValues = Record<string, string | string[] | Date | null>;
+
 export interface CrossDockBooking {
   id: string;
   title: string;
@@ -42,6 +45,7 @@ export interface CrossDockBooking {
   status: 'scheduled' | 'arrived' | 'in_progress' | 'completed' | 'cancelled';
   createdBy: string;
   createdAt: Date;
+  customFields?: CustomFieldValues;
 }
 
 export type CalendarView = 'day' | 'week';

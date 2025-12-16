@@ -1,10 +1,11 @@
 import { Header } from '@/components/Header';
 import { DockConfiguration } from '@/components/settings/DockConfiguration';
 import { CartonCloudIntegration } from '@/components/settings/CartonCloudIntegration';
+import { CardConfiguration } from '@/components/settings/CardConfiguration';
 import { mockUser } from '@/data/mockData';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DoorOpen, Link2, Users, Clock } from 'lucide-react';
+import { DoorOpen, Link2, Users, Clock, LayoutGrid } from 'lucide-react';
 
 const Settings = () => {
   return (
@@ -18,10 +19,14 @@ const Settings = () => {
         </div>
 
         <Tabs defaultValue="docks" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
             <TabsTrigger value="docks" className="gap-2">
               <DoorOpen className="w-4 h-4" />
-              <span className="hidden sm:inline">Dock Config</span>
+              <span className="hidden sm:inline">Docks</span>
+            </TabsTrigger>
+            <TabsTrigger value="cards" className="gap-2">
+              <LayoutGrid className="w-4 h-4" />
+              <span className="hidden sm:inline">Cards</span>
             </TabsTrigger>
             <TabsTrigger value="integration" className="gap-2">
               <Link2 className="w-4 h-4" />
@@ -41,6 +46,14 @@ const Settings = () => {
             <Card>
               <CardContent className="pt-6">
                 <DockConfiguration />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="cards">
+            <Card>
+              <CardContent className="pt-6">
+                <CardConfiguration />
               </CardContent>
             </Card>
           </TabsContent>
