@@ -1,4 +1,4 @@
-import { CrossDockBooking } from '@/types/booking';
+import { CrossDockBooking, CartonCloudPO } from '@/types/booking';
 import { Clock, Truck, Package, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useRef, DragEvent } from 'react';
@@ -11,14 +11,16 @@ interface DraggableBookingCardProps {
   onResize?: (booking: CrossDockBooking, newEndTime: string) => void;
   compact?: boolean;
   isDragging?: boolean;
+  dockColor?: string;
+  showDockBadge?: boolean;
 }
 
-const statusColors: Record<string, string> = {
-  scheduled: 'border-l-accent bg-booking',
-  arrived: 'border-l-warning bg-warning/10',
-  in_progress: 'border-l-accent bg-accent/10',
-  completed: 'border-l-success bg-success/10',
-  cancelled: 'border-l-destructive bg-destructive/10',
+const statusBorderColors: Record<string, string> = {
+  scheduled: 'border-l-accent',
+  arrived: 'border-l-warning',
+  in_progress: 'border-l-accent',
+  completed: 'border-l-success',
+  cancelled: 'border-l-destructive',
 };
 
 export function DraggableBookingCard({ 
@@ -28,7 +30,9 @@ export function DraggableBookingCard({
   onDragEnd,
   onResize,
   compact = false,
-  isDragging = false 
+  isDragging = false,
+  dockColor,
+  showDockBadge = true,
 }: DraggableBookingCardProps) {
   const [isResizing, setIsResizing] = useState(false);
   const [resizePreview, setResizePreview] = useState<string | null>(null);
@@ -102,6 +106,19 @@ export function DraggableBookingCard({
 
   const displayEndTime = resizePreview || booking.endTime;
 
+  // Determine background color - use dock color if provided, otherwise status-based
+  const bgStyle = dockColor
+    ? { backgroundColor: `${dockColor}20` }
+    : undefined;
+
+  const bgClass = !dockColor
+    ? booking.status === 'arrived' ? 'bg-warning/10'
+      : booking.status === 'in_progress' ? 'bg-accent/10'
+      : booking.status === 'completed' ? 'bg-success/10'
+      : booking.status === 'cancelled' ? 'bg-destructive/10'
+      : 'bg-booking'
+    : '';
+
   return (
     <div
       ref={cardRef}
@@ -116,11 +133,13 @@ export function DraggableBookingCard({
       }}
       className={cn(
         'rounded-md p-2 border-l-4 cursor-grab transition-all duration-200 hover:shadow-card-hover relative group h-full overflow-hidden',
-        statusColors[booking.status],
+        statusBorderColors[booking.status],
+        bgClass,
         compact ? 'text-xs' : 'text-sm',
         isDragging && 'opacity-50 shadow-lg',
         isResizing && 'cursor-ns-resize'
       )}
+      style={bgStyle}
     >
       {/* Drag handle indicator */}
       <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-60 transition-opacity">
@@ -143,14 +162,14 @@ export function DraggableBookingCard({
             </div>
           )}
           
-          {booking.purchaseOrder && (
+          {(booking.purchaseOrder || booking.cartonCloudPO) && (
             <div className="flex items-center gap-1 mt-1 text-accent">
               <Package className="w-3 h-3" />
-              <span>PO: {booking.purchaseOrder.reference}</span>
+              <span>PO: {booking.purchaseOrder?.reference || booking.cartonCloudPO?.reference}</span>
             </div>
           )}
           
-          {booking.dockNumber && (
+          {booking.dockNumber && showDockBadge && (
             <div className="mt-2 inline-block px-2 py-0.5 bg-primary/10 text-primary text-xs rounded">
               Dock {booking.dockNumber}
             </div>

@@ -9,14 +9,16 @@ import { BookingModal } from '@/components/BookingModal';
 import { Sidebar } from '@/components/Sidebar';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { useDockDoors } from '@/hooks/useDockDoors';
 
 const Index = () => {
+  const { data: dockDoors } = useDockDoors();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<CalendarView>('day');
   const [bookings, setBookings] = useState<CrossDockBooking[]>(mockBookings);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<CrossDockBooking | null>(null);
-  const [defaultSlot, setDefaultSlot] = useState<{ date: Date; hour: number } | null>(null);
+  const [defaultSlot, setDefaultSlot] = useState<{ date: Date; hour: number; dockNumber?: number } | null>(null);
 
   const handleAddBooking = () => {
     setSelectedBooking(null);
@@ -24,9 +26,19 @@ const Index = () => {
     setModalOpen(true);
   };
 
-  const handleTimeSlotClick = (date: Date, hour: number) => {
+  const handleTimeSlotClick = (date: Date, hour: number, dockId?: string) => {
     setSelectedBooking(null);
-    setDefaultSlot({ date, hour });
+    
+    // Find dock number from dock ID
+    let dockNumber: number | undefined;
+    if (dockId && dockDoors) {
+      const dock = dockDoors.find(d => d.id === dockId);
+      if (dock) {
+        dockNumber = parseInt(dock.name.replace(/\D/g, ''), 10) || undefined;
+      }
+    }
+    
+    setDefaultSlot({ date, hour, dockNumber });
     setModalOpen(true);
   };
 
@@ -83,7 +95,7 @@ const Index = () => {
     });
   };
 
-  const handleBookingMove = (booking: CrossDockBooking, newDate: Date, dropHour: number, offsetMinutes: number) => {
+  const handleBookingMove = (booking: CrossDockBooking, newDate: Date, dropHour: number, offsetMinutes: number, newDockId?: string) => {
     // Calculate the duration of the booking in minutes
     const [startH, startM] = booking.startTime.split(':').map(Number);
     const [endH, endM] = booking.endTime.split(':').map(Number);
@@ -108,17 +120,27 @@ const Index = () => {
     const newStartTime = `${newStartHour.toString().padStart(2, '0')}:${newStartMin.toString().padStart(2, '0')}`;
     const newEndTime = `${newEndHour.toString().padStart(2, '0')}:${newEndMin.toString().padStart(2, '0')}`;
     
+    // Get new dock number from dock ID
+    let newDockNumber: number | undefined = booking.dockNumber;
+    if (newDockId && dockDoors) {
+      const dock = dockDoors.find(d => d.id === newDockId);
+      if (dock) {
+        newDockNumber = parseInt(dock.name.replace(/\D/g, ''), 10) || undefined;
+      }
+    }
+    
     setBookings((prev) =>
       prev.map((b) =>
         b.id === booking.id
-          ? { ...b, date: newDate, startTime: newStartTime, endTime: newEndTime }
+          ? { ...b, date: newDate, startTime: newStartTime, endTime: newEndTime, dockNumber: newDockNumber }
           : b
       )
     );
     
+    const dockInfo = newDockNumber ? ` on Dock ${newDockNumber}` : '';
     toast({
       title: 'Booking Moved',
-      description: `${booking.title} moved to ${format(newDate, 'EEE, MMM d')} at ${newStartTime}`,
+      description: `${booking.title} moved to ${format(newDate, 'EEE, MMM d')} at ${newStartTime}${dockInfo}`,
     });
   };
 
@@ -183,6 +205,7 @@ const Index = () => {
         booking={selectedBooking}
         defaultDate={defaultSlot?.date}
         defaultHour={defaultSlot?.hour}
+        defaultDockNumber={defaultSlot?.dockNumber}
       />
     </div>
   );
