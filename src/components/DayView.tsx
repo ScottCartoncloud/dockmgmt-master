@@ -28,13 +28,13 @@ export function DayView({ date, bookings, onTimeSlotClick, onBookingClick }: Day
 
   return (
     <div className="flex-1 overflow-auto">
-      <div className="min-w-[600px]">
+      <div className="min-w-[500px]">
         {/* Day header */}
         <div className="sticky top-0 z-10 bg-card border-b border-border">
-          <div className="grid grid-cols-[80px_1fr]">
-            <div className="p-3 border-r border-border" />
-            <div className="p-3 text-center">
-              <div className="text-sm text-muted-foreground">
+          <div className="flex">
+            <div className="w-[60px] flex-shrink-0 p-2 border-r border-border" />
+            <div className="flex-1 p-2 text-center">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide">
                 {format(date, 'EEEE')}
               </div>
               <div className={cn(
@@ -48,23 +48,20 @@ export function DayView({ date, bookings, onTimeSlotClick, onBookingClick }: Day
         </div>
 
         {/* Time slots */}
-        <div className="relative">
+        <div>
           {HOURS.map(({ hour, label }) => (
-            <div
-              key={hour}
-              className="grid grid-cols-[80px_1fr] border-b border-border"
-            >
-              <div className="p-2 text-right pr-3 text-sm text-muted-foreground border-r border-border">
+            <div key={hour} className="flex border-b border-border">
+              <div className="w-[60px] flex-shrink-0 h-[60px] flex items-start justify-end pr-2 pt-1 text-xs text-muted-foreground border-r border-border">
                 {label}
               </div>
               <div
                 className={cn(
-                  'min-h-[80px] p-2 cursor-pointer transition-colors hover:bg-muted/50',
+                  'flex-1 h-[60px] p-2 cursor-pointer transition-colors hover:bg-muted/50 overflow-hidden',
                   isCurrentHour(hour) && 'bg-accent/5'
                 )}
                 onClick={() => onTimeSlotClick(date, hour)}
               >
-                <div className="space-y-2">
+                <div className="space-y-1 overflow-y-auto max-h-full">
                   {getBookingsForHour(hour).map((booking) => (
                     <BookingCard
                       key={booking.id}
