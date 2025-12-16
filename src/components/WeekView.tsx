@@ -114,10 +114,21 @@ export function WeekView({
             {HOURS.map(({ hour, label }) => (
               <div 
                 key={hour} 
-                className="flex items-start justify-end pr-2 pt-1 text-xs text-muted-foreground border-b border-border"
+                className="relative border-b border-border"
                 style={{ height: HOUR_HEIGHT }}
               >
-                {label}
+                <div className="absolute top-0 right-2 text-xs text-muted-foreground">
+                  {label}
+                </div>
+                <div className="absolute top-[25%] right-2 text-[10px] text-muted-foreground/50">
+                  :15
+                </div>
+                <div className="absolute top-[50%] right-2 text-[10px] text-muted-foreground/60">
+                  :30
+                </div>
+                <div className="absolute top-[75%] right-2 text-[10px] text-muted-foreground/50">
+                  :45
+                </div>
               </div>
             ))}
           </div>
@@ -137,7 +148,7 @@ export function WeekView({
                     <div
                       key={hour}
                       className={cn(
-                        'border-b border-border cursor-pointer transition-colors',
+                        'border-b border-border cursor-pointer transition-colors relative',
                         isCurrentHour(day, hour) && 'bg-accent/5',
                         isDropTarget && 'bg-accent/20 ring-2 ring-accent ring-inset',
                         !isDropTarget && 'hover:bg-muted/50'
@@ -147,7 +158,12 @@ export function WeekView({
                       onDragOver={(e) => handleDragOver(e, day, hour)}
                       onDragLeave={handleDragLeave}
                       onDrop={(e) => handleDrop(e, day, hour)}
-                    />
+                    >
+                      {/* 15-minute tick marks */}
+                      <div className="absolute left-0 right-0 top-[25%] border-t border-dashed border-border/40" />
+                      <div className="absolute left-0 right-0 top-[50%] border-t border-dotted border-border/60" />
+                      <div className="absolute left-0 right-0 top-[75%] border-t border-dashed border-border/40" />
+                    </div>
                   );
                 })}
 
