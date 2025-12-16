@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { CrossDockBooking, CartonCloudPO } from '@/types/booking';
-import { DOCK_NUMBERS } from '@/data/mockData';
 import { format } from 'date-fns';
 import { X, Search, Package, ExternalLink, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -37,6 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useSearchCartonCloudOrders, useCartonCloudSettings } from '@/hooks/useCartonCloudSettings';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
+import { useDockDoors } from '@/hooks/useDockDoors';
 
 interface BookingModalProps {
   open: boolean;
@@ -46,6 +46,7 @@ interface BookingModalProps {
   booking?: CrossDockBooking | null;
   defaultDate?: Date;
   defaultHour?: number;
+  defaultDockNumber?: number;
 }
 
 export function BookingModal({
@@ -56,6 +57,7 @@ export function BookingModal({
   booking,
   defaultDate,
   defaultHour,
+  defaultDockNumber,
 }: BookingModalProps) {
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
@@ -72,8 +74,10 @@ export function BookingModal({
   const [searchResults, setSearchResults] = useState<CartonCloudPO[]>([]);
 
   const { data: cartonCloudSettings } = useCartonCloudSettings();
+  const { data: dockDoors } = useDockDoors();
   const searchOrders = useSearchCartonCloudOrders();
   const isCartonCloudConnected = !!cartonCloudSettings;
+  const activeDocks = dockDoors?.filter(d => d.is_active) || [];
 
   const isEditing = !!booking;
 
@@ -116,14 +120,14 @@ export function BookingModal({
       setEndTime(defaultHour ? `${(defaultHour + 1).toString().padStart(2, '0')}:00` : '10:00');
       setCarrier('');
       setTruckRego('');
-      setDockNumber('');
+      setDockNumber(defaultDockNumber?.toString() || '');
       setNotes('');
       setStatus('scheduled');
       setSelectedPO(null);
     }
     setSearchTerm('');
     setSearchResults([]);
-  }, [booking, defaultDate, defaultHour, open]);
+  }, [booking, defaultDate, defaultHour, defaultDockNumber, open]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -358,17 +362,26 @@ export function BookingModal({
           {/* Dock and Status */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Dock Number</Label>
+              <Label>Dock</Label>
               <Select value={dockNumber} onValueChange={setDockNumber}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select dock" />
                 </SelectTrigger>
                 <SelectContent>
-                  {DOCK_NUMBERS.map((num) => (
-                    <SelectItem key={num} value={num.toString()}>
-                      Dock {num}
-                    </SelectItem>
-                  ))}
+                  {activeDocks.map((dock) => {
+                    const dockNum = parseInt(dock.name.replace(/\D/g, ''), 10);
+                    return (
+                      <SelectItem key={dock.id} value={dockNum.toString()}>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-2.5 h-2.5 rounded-full"
+                            style={{ backgroundColor: dock.color }}
+                          />
+                          {dock.name}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
