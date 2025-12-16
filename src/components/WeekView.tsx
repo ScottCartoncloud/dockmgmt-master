@@ -5,6 +5,9 @@ import { format, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useState, DragEvent } from 'react';
 
+const HOUR_HEIGHT = 80; // pixels per hour
+const START_HOUR = HOURS[0]?.hour || 6; // Calendar starts at this hour
+
 interface WeekViewProps {
   date: Date;
   bookings: CrossDockBooking[];
@@ -28,11 +31,8 @@ export function WeekView({
   const weekStart = startOfWeek(date, { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  const getBookingsForDayAndHour = (day: Date, hour: number) => {
-    return bookings.filter((b) => {
-      const startHour = parseInt(b.startTime.split(':')[0]);
-      return isSameDay(b.date, day) && startHour === hour;
-    });
+  const getBookingsForDay = (day: Date) => {
+    return bookings.filter((b) => isSameDay(b.date, day));
   };
 
   const isCurrentHour = (day: Date, hour: number) => {
@@ -63,11 +63,27 @@ export function WeekView({
     }
   };
 
+  // Calculate booking position and height based on time (accounting for calendar start hour)
+  const getBookingStyle = (booking: CrossDockBooking) => {
+    const [startHour, startMin] = booking.startTime.split(':').map(Number);
+    const [endHour, endMin] = booking.endTime.split(':').map(Number);
+    
+    // Offset from the calendar start hour
+    const startOffset = ((startHour - START_HOUR) * HOUR_HEIGHT) + (startMin / 60 * HOUR_HEIGHT);
+    const endOffset = ((endHour - START_HOUR) * HOUR_HEIGHT) + (endMin / 60 * HOUR_HEIGHT);
+    const height = Math.max(endOffset - startOffset, 20); // min height of 20px for compact view
+    
+    return {
+      top: Math.max(0, startOffset),
+      height,
+    };
+  };
+
   return (
     <div className="flex-1 overflow-auto">
       <div className="min-w-[900px]">
         {/* Week header */}
-        <div className="sticky top-0 z-10 bg-card border-b border-border">
+        <div className="sticky top-0 z-20 bg-card border-b border-border">
           <div className="flex">
             <div className="w-[60px] flex-shrink-0 p-2 border-r border-border" />
             {weekDays.map((day) => (
@@ -89,36 +105,64 @@ export function WeekView({
           </div>
         </div>
 
-        {/* Time slots */}
-        <div>
-          {HOURS.map(({ hour, label }) => (
-            <div key={hour} className="flex border-b border-border">
-              <div className="w-[60px] flex-shrink-0 h-[60px] flex items-start justify-end pr-2 pt-1 text-xs text-muted-foreground border-r border-border">
+        {/* Time grid with bookings overlay */}
+        <div className="flex">
+          {/* Time labels column */}
+          <div className="w-[60px] flex-shrink-0 border-r border-border">
+            {HOURS.map(({ hour, label }) => (
+              <div 
+                key={hour} 
+                className="flex items-start justify-end pr-2 pt-1 text-xs text-muted-foreground border-b border-border"
+                style={{ height: HOUR_HEIGHT }}
+              >
                 {label}
               </div>
-              {weekDays.map((day) => {
-                const slotBookings = getBookingsForDayAndHour(day, hour);
-                const slotKey = getSlotKey(day, hour);
-                const isDropTarget = dragOverSlot === slotKey;
-                
-                return (
-                  <div
-                    key={slotKey}
-                    className={cn(
-                      'flex-1 h-[60px] p-1 cursor-pointer transition-colors border-r border-border last:border-r-0 overflow-hidden',
-                      isCurrentHour(day, hour) && 'bg-accent/5',
-                      isDropTarget && 'bg-accent/20 ring-2 ring-accent ring-inset',
-                      !isDropTarget && 'hover:bg-muted/50'
-                    )}
-                    onClick={() => onTimeSlotClick(day, hour)}
-                    onDragOver={(e) => handleDragOver(e, day, hour)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, day, hour)}
-                  >
-                    <div className="space-y-1 overflow-y-auto max-h-full">
-                      {slotBookings.map((booking) => (
+            ))}
+          </div>
+
+          {/* Day columns */}
+          {weekDays.map((day) => {
+            const dayBookings = getBookingsForDay(day);
+            
+            return (
+              <div key={day.toISOString()} className="flex-1 relative border-r border-border last:border-r-0">
+                {/* Hour grid lines and click targets */}
+                {HOURS.map(({ hour }) => {
+                  const slotKey = getSlotKey(day, hour);
+                  const isDropTarget = dragOverSlot === slotKey;
+                  
+                  return (
+                    <div
+                      key={hour}
+                      className={cn(
+                        'border-b border-border cursor-pointer transition-colors',
+                        isCurrentHour(day, hour) && 'bg-accent/5',
+                        isDropTarget && 'bg-accent/20 ring-2 ring-accent ring-inset',
+                        !isDropTarget && 'hover:bg-muted/50'
+                      )}
+                      style={{ height: HOUR_HEIGHT }}
+                      onClick={() => onTimeSlotClick(day, hour)}
+                      onDragOver={(e) => handleDragOver(e, day, hour)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, day, hour)}
+                    />
+                  );
+                })}
+
+                {/* Bookings overlay - positioned absolutely */}
+                <div className="absolute inset-0 pointer-events-none">
+                  {dayBookings.map((booking) => {
+                    const style = getBookingStyle(booking);
+                    return (
+                      <div
+                        key={booking.id}
+                        className="absolute left-0.5 right-0.5 pointer-events-auto z-10"
+                        style={{
+                          top: style.top,
+                          height: style.height,
+                        }}
+                      >
                         <DraggableBookingCard
-                          key={booking.id}
                           booking={booking}
                           onClick={onBookingClick}
                           onDragStart={setDraggingBooking}
@@ -127,13 +171,13 @@ export function WeekView({
                           compact
                           isDragging={draggingBooking?.id === booking.id}
                         />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
