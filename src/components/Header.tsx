@@ -107,25 +107,25 @@ export function Header({ user }: HeaderProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="center" className="w-56">
             <DropdownMenuLabel className="text-xs text-muted-foreground">Configuration</DropdownMenuLabel>
-            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings')}>
+            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=docks')}>
               <DoorOpen className="w-4 h-4" />
               Dock Configuration
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings')}>
+            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=cards')}>
               <LayoutGrid className="w-4 h-4" />
               Card Configuration
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings')}>
+            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=integration')}>
               <Link2 className="w-4 h-4" />
               CartonCloud Integration
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-xs text-muted-foreground">Administration</DropdownMenuLabel>
-            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings')}>
+            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=users')}>
               <Users className="w-4 h-4" />
               User & Role Management
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings')}>
+            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=defaults')}>
               <Clock className="w-4 h-4" />
               Booking Defaults
             </DropdownMenuItem>
