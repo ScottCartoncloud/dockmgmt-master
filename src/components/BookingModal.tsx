@@ -411,14 +411,51 @@ export function BookingModal({
               <Label>Status</Label>
               <Select value={status} onValueChange={(v) => setStatus(v as CrossDockBooking['status'])}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue>
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "w-2.5 h-2.5 rounded-full",
+                        status === 'scheduled' && "bg-accent",
+                        status === 'arrived' && "bg-success",
+                        status === 'in_progress' && "bg-accent",
+                        status === 'completed' && "bg-muted-foreground",
+                        status === 'cancelled' && "bg-destructive"
+                      )} />
+                      <span className="capitalize">{status.replace('_', ' ')}</span>
+                    </div>
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="scheduled">Scheduled</SelectItem>
-                  <SelectItem value="arrived">Arrived</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="scheduled">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-accent" />
+                      Scheduled
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="arrived">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-success" />
+                      Arrived
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="in_progress">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-accent" />
+                      In Progress
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="completed">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground" />
+                      Completed
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="cancelled">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-destructive" />
+                      Cancelled
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
