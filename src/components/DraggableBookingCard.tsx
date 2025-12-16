@@ -24,11 +24,27 @@ interface DraggableBookingCardProps {
 // Status indicator colors (left border)
 // Blue = Scheduled, Green = Arrived, Grey = Completed, Red = Cancelled
 const statusBorderColors: Record<string, string> = {
-  scheduled: 'border-l-blue-500',
-  arrived: 'border-l-green-500',
-  in_progress: 'border-l-blue-400',
-  completed: 'border-l-gray-400',
-  cancelled: 'border-l-red-500',
+  scheduled: 'border-l-accent',
+  arrived: 'border-l-success',
+  in_progress: 'border-l-accent',
+  completed: 'border-l-muted-foreground',
+  cancelled: 'border-l-destructive',
+};
+
+type LinkedPOShape = {
+  id: string;
+  reference: string;
+  customer: string;
+};
+
+const isValidLinkedPO = (po: unknown): po is LinkedPOShape => {
+  if (!po || typeof po !== 'object') return false;
+  const anyPO = po as Record<string, unknown>;
+  return (
+    typeof anyPO.id === 'string' && anyPO.id.length > 0 &&
+    typeof anyPO.reference === 'string' && anyPO.reference.length > 0 &&
+    typeof anyPO.customer === 'string' && anyPO.customer.length > 0
+  );
 };
 
 export function DraggableBookingCard({ 
@@ -127,6 +143,9 @@ export function DraggableBookingCard({
       : 'bg-booking'
     : '';
 
+  const linkedPO = booking.cartonCloudPO ?? booking.purchaseOrder;
+  const linkedPOValid = isValidLinkedPO(linkedPO) ? linkedPO : null;
+
   return (
     <div
       ref={cardRef}
@@ -152,7 +171,7 @@ export function DraggableBookingCard({
       {/* Top-right icons container */}
       <div className="absolute top-1 right-1 flex items-center gap-1">
         {/* CartonCloud linked indicator */}
-        {(booking.cartonCloudPO || booking.purchaseOrder) && (
+        {linkedPOValid && (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -188,10 +207,10 @@ export function DraggableBookingCard({
             </div>
           )}
           
-          {(booking.purchaseOrder || booking.cartonCloudPO) && (
+          {linkedPOValid && (
             <div className="flex items-center gap-1 mt-1 text-accent">
               <Package className="w-3 h-3" />
-              <span>PO: {booking.purchaseOrder?.reference || booking.cartonCloudPO?.reference}</span>
+              <span>PO: {linkedPOValid.reference}</span>
             </div>
           )}
           
