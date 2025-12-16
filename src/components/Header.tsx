@@ -6,6 +6,7 @@ import {
   Truck, 
   Settings,
   DoorOpen,
+  LayoutGrid,
   Link2,
   Users,
   Clock
@@ -109,6 +110,10 @@ export function Header({ user }: HeaderProps) {
             <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings')}>
               <DoorOpen className="w-4 h-4" />
               Dock Configuration
+            </DropdownMenuItem>
+            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings')}>
+              <LayoutGrid className="w-4 h-4" />
+              Card Configuration
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings')}>
               <Link2 className="w-4 h-4" />
