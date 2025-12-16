@@ -115,6 +115,33 @@ export const mockBookings: CrossDockBooking[] = [
     createdBy: '1',
     createdAt: addDays(today, -3),
   },
+  {
+    id: '5',
+    title: 'General Freight Drop',
+    date: setMinutes(setHours(today, 16), 0),
+    startTime: '16:00',
+    endTime: '17:00',
+    carrier: 'Standard Trucking',
+    truckRego: 'STD-111',
+    dockNumber: 2,
+    // No linked PO
+    status: 'scheduled',
+    createdBy: '1',
+    createdAt: addDays(today, -1),
+  },
+  {
+    id: '6',
+    title: 'Walk-in Delivery',
+    date: setMinutes(setHours(today, 8), 0),
+    startTime: '08:00',
+    endTime: '08:45',
+    carrier: 'Local Runner',
+    dockNumber: 3,
+    // No linked PO
+    status: 'completed',
+    createdBy: '1',
+    createdAt: addDays(today, -2),
+  },
 ];
 
 export const DOCK_NUMBERS = [1, 2, 3, 4, 5];
