@@ -130,6 +130,14 @@ export function Sidebar({ bookings, onBookingClick }: SidebarProps) {
             <span className="w-2 h-2 rounded-full bg-warning" />
             Click a booking to edit details
           </p>
+          <p className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-success" />
+            Drag bookings to move them
+          </p>
+          <p className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-muted-foreground" />
+            Drag bottom edge to resize
+          </p>
         </div>
       </div>
     </div>
