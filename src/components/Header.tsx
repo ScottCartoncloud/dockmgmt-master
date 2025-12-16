@@ -4,16 +4,11 @@ import {
   ChevronDown, 
   Search, 
   Truck, 
-  Calendar,
-  BarChart3,
   Settings,
   DoorOpen,
   Link2,
   Users,
-  Clock,
-  FileText,
-  Activity,
-  TrendingUp
+  Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -88,43 +83,9 @@ export function Header({ user }: HeaderProps) {
       {/* Navigation - Centered */}
       <nav className="flex items-center justify-center gap-2 px-4 py-2">
         <Button variant="ghost" className="text-header-foreground hover:bg-header-foreground/10 gap-2">
-          <Calendar className="w-4 h-4" />
-          Dashboard
-        </Button>
-        
-        <span className="text-header-foreground/30">|</span>
-        
-        <Button variant="ghost" className="text-header-foreground hover:bg-header-foreground/10 gap-2">
           <Truck className="w-4 h-4" />
           Bookings
         </Button>
-        
-        <span className="text-header-foreground/30">|</span>
-        
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="text-header-foreground hover:bg-header-foreground/10 gap-2">
-              <BarChart3 className="w-4 h-4" />
-              Reports
-              <ChevronDown className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="center" className="w-56">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Analytics & Insights</DropdownMenuLabel>
-            <DropdownMenuItem className="gap-2">
-              <FileText className="w-4 h-4" />
-              Booking History
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2">
-              <Activity className="w-4 h-4" />
-              Dock Utilization
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Carrier Performance
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
         
         <span className="text-header-foreground/30">|</span>
         
