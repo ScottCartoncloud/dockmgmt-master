@@ -63,16 +63,19 @@ export function DraggableBookingCard({
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const deltaY = moveEvent.clientY - startYRef.current;
-      const hoursDelta = Math.round(deltaY / 60); // 60px per hour
+      // 80px per hour, so 20px per 15 minutes
+      const quarterHoursDelta = Math.round(deltaY / 20);
       
       const [hours, minutes] = startEndTimeRef.current.split(':').map(Number);
-      let newHours = hours + hoursDelta;
+      const totalMinutes = hours * 60 + minutes + (quarterHoursDelta * 15);
       
-      // Clamp between start time + 1 hour and 23:00
-      const startHour = parseInt(booking.startTime.split(':')[0]);
-      newHours = Math.max(startHour + 1, Math.min(23, newHours));
+      // Clamp: minimum 15 min after start, max 23:45
+      const startMinutes = parseInt(booking.startTime.split(':')[0]) * 60 + parseInt(booking.startTime.split(':')[1]);
+      const clampedMinutes = Math.max(startMinutes + 15, Math.min(23 * 60 + 45, totalMinutes));
       
-      const newEndTime = `${newHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      const newHours = Math.floor(clampedMinutes / 60);
+      const newMins = clampedMinutes % 60;
+      const newEndTime = `${newHours.toString().padStart(2, '0')}:${newMins.toString().padStart(2, '0')}`;
       setResizePreview(newEndTime);
     };
 
@@ -105,7 +108,7 @@ export function DraggableBookingCard({
         }
       }}
       className={cn(
-        'rounded-md p-2 border-l-4 cursor-grab transition-all duration-200 hover:shadow-card-hover relative group',
+        'rounded-md p-2 border-l-4 cursor-grab transition-all duration-200 hover:shadow-card-hover relative group h-full overflow-hidden',
         statusColors[booking.status],
         compact ? 'text-xs' : 'text-sm',
         isDragging && 'opacity-50 shadow-lg',
