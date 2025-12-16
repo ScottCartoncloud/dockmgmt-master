@@ -13,7 +13,7 @@ interface DayViewProps {
   bookings: CrossDockBooking[];
   onTimeSlotClick: (date: Date, hour: number) => void;
   onBookingClick: (booking: CrossDockBooking) => void;
-  onBookingMove?: (booking: CrossDockBooking, newDate: Date, newHour: number) => void;
+  onBookingMove?: (booking: CrossDockBooking, newDate: Date, newHour: number, offsetMinutes: number) => void;
   onBookingResize?: (booking: CrossDockBooking, newEndTime: string) => void;
 }
 
@@ -50,9 +50,11 @@ export function DayView({
     setDragOverSlot(null);
     
     const bookingData = e.dataTransfer.getData('bookingData');
+    const offsetMinutes = parseInt(e.dataTransfer.getData('offsetMinutes') || '0', 10);
+    
     if (bookingData && onBookingMove) {
       const booking = JSON.parse(bookingData) as CrossDockBooking;
-      onBookingMove(booking, date, hour);
+      onBookingMove(booking, date, hour, offsetMinutes);
     }
   };
 
