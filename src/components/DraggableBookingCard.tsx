@@ -1,7 +1,13 @@
 import { CrossDockBooking, CartonCloudPO } from '@/types/booking';
-import { Clock, Truck, Package, GripVertical } from 'lucide-react';
+import { Clock, Truck, Package, GripVertical, Cloud } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useRef, DragEvent } from 'react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface DraggableBookingCardProps {
   booking: CrossDockBooking;
@@ -15,12 +21,14 @@ interface DraggableBookingCardProps {
   showDockBadge?: boolean;
 }
 
+// Status indicator colors (left border)
+// Blue = Scheduled, Green = Arrived, Grey = Completed, Red = Cancelled
 const statusBorderColors: Record<string, string> = {
-  scheduled: 'border-l-accent',
-  arrived: 'border-l-warning',
-  in_progress: 'border-l-accent',
-  completed: 'border-l-success',
-  cancelled: 'border-l-destructive',
+  scheduled: 'border-l-blue-500',
+  arrived: 'border-l-green-500',
+  in_progress: 'border-l-blue-400',
+  completed: 'border-l-gray-400',
+  cancelled: 'border-l-red-500',
 };
 
 export function DraggableBookingCard({ 
@@ -141,12 +149,30 @@ export function DraggableBookingCard({
       )}
       style={bgStyle}
     >
-      {/* Drag handle indicator */}
-      <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-60 transition-opacity">
-        <GripVertical className="w-3 h-3 text-muted-foreground" />
+      {/* Top-right icons container */}
+      <div className="absolute top-1 right-1 flex items-center gap-1">
+        {/* CartonCloud linked indicator */}
+        {(booking.cartonCloudPO || booking.purchaseOrder) && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="w-4 h-4 bg-accent/20 rounded flex items-center justify-center">
+                  <Cloud className="w-3 h-3 text-accent" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Linked to CartonCloud PO</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+        {/* Drag handle indicator */}
+        <div className="opacity-0 group-hover:opacity-60 transition-opacity">
+          <GripVertical className="w-3 h-3 text-muted-foreground" />
+        </div>
       </div>
 
-      <div className="font-medium text-foreground truncate pr-4">{booking.title}</div>
+      <div className="font-medium text-foreground truncate pr-8">{booking.title}</div>
       
       {!compact && (
         <>

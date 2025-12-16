@@ -60,7 +60,7 @@ export function CalendarHeader({
   return (
     <div className="flex items-center justify-between p-4 border-b border-border bg-card">
       <div className="flex items-center gap-4">
-        <h1 className="text-2xl font-semibold text-foreground">Cross Dock Schedule</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Bookings</h1>
         
         <div className="flex items-center gap-2 ml-4">
           <Button
@@ -95,7 +95,7 @@ export function CalendarHeader({
             <PopoverTrigger asChild>
               <Button
                 variant="ghost"
-                className="text-lg font-medium hover:bg-muted"
+                className="text-lg font-medium hover:bg-accent/10 hover:text-foreground border border-transparent hover:border-border"
               >
                 {getDateRangeLabel()}
               </Button>
