@@ -93,8 +93,7 @@ export const mockBookings: CrossDockBooking[] = [
     endTime: '11:30',
     carrier: 'Local Haulers',
     dockNumber: 3,
-    purchaseOrderId: 'PO-1234890',
-    purchaseOrder: mockPurchaseOrders[2],
+    // No linked PO
     notes: 'Large pallets - need forklift ready',
     status: 'scheduled',
     createdBy: '1',
