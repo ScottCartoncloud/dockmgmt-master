@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { CrossDockBooking, PurchaseOrder } from '@/types/booking';
-import { mockPurchaseOrders, DOCK_NUMBERS } from '@/data/mockData';
-import { format, setHours } from 'date-fns';
-import { X, Search, Package, ExternalLink, Trash2 } from 'lucide-react';
+import { CrossDockBooking, CartonCloudPO } from '@/types/booking';
+import { DOCK_NUMBERS } from '@/data/mockData';
+import { format } from 'date-fns';
+import { X, Search, Package, ExternalLink, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,6 +35,8 @@ import {
 } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useSearchCartonCloudOrders, useCartonCloudSettings } from '@/hooks/useCartonCloudSettings';
+import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 
 interface BookingModalProps {
   open: boolean;
@@ -64,10 +66,35 @@ export function BookingModal({
   const [dockNumber, setDockNumber] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState<CrossDockBooking['status']>('scheduled');
-  const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
+  const [selectedPO, setSelectedPO] = useState<CartonCloudPO | null>(null);
   const [poSearchOpen, setPoSearchOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<CartonCloudPO[]>([]);
+
+  const { data: cartonCloudSettings } = useCartonCloudSettings();
+  const searchOrders = useSearchCartonCloudOrders();
+  const isCartonCloudConnected = !!cartonCloudSettings;
 
   const isEditing = !!booking;
+
+  const debouncedSearch = useDebouncedCallback((term: string) => {
+    if (term.length >= 2 && isCartonCloudConnected) {
+      searchOrders.mutate(term, {
+        onSuccess: (results) => {
+          setSearchResults(results);
+        },
+        onError: () => {
+          setSearchResults([]);
+        },
+      });
+    } else {
+      setSearchResults([]);
+    }
+  }, 300);
+
+  useEffect(() => {
+    debouncedSearch(searchTerm);
+  }, [searchTerm]);
 
   useEffect(() => {
     if (booking) {
@@ -80,7 +107,7 @@ export function BookingModal({
       setDockNumber(booking.dockNumber?.toString() || '');
       setNotes(booking.notes || '');
       setStatus(booking.status);
-      setSelectedPO(booking.purchaseOrder || null);
+      setSelectedPO(booking.cartonCloudPO || null);
     } else {
       // Reset form for new booking
       setTitle('');
@@ -94,6 +121,8 @@ export function BookingModal({
       setStatus('scheduled');
       setSelectedPO(null);
     }
+    setSearchTerm('');
+    setSearchResults([]);
   }, [booking, defaultDate, defaultHour, open]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -109,7 +138,7 @@ export function BookingModal({
       truckRego: truckRego || undefined,
       dockNumber: dockNumber ? parseInt(dockNumber) : undefined,
       purchaseOrderId: selectedPO?.id,
-      purchaseOrder: selectedPO || undefined,
+      cartonCloudPO: selectedPO || undefined,
       notes: notes || undefined,
       status,
     });
@@ -121,6 +150,21 @@ export function BookingModal({
     if (booking && onDelete) {
       onDelete(booking.id);
       onClose();
+    }
+  };
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status.toUpperCase()) {
+      case 'ALLOCATED':
+      case 'IN_TRANSIT':
+        return 'default';
+      case 'VERIFIED':
+      case 'COMPLETED':
+        return 'secondary';
+      case 'DRAFT':
+        return 'outline';
+      default:
+        return 'secondary';
     }
   };
 
@@ -136,74 +180,111 @@ export function BookingModal({
         <form onSubmit={handleSubmit} className="space-y-6 mt-4">
           {/* PO Search */}
           <div className="space-y-2">
-            <Label>CartonCloud Purchase Order</Label>
-            <Popover open={poSearchOpen} onOpenChange={setPoSearchOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-left font-normal"
-                >
-                  {selectedPO ? (
-                    <div className="flex items-center gap-2">
-                      <Package className="w-4 h-4 text-accent" />
-                      <span>PO: {selectedPO.reference}</span>
-                      <span className="text-muted-foreground">- {selectedPO.customer}</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Search className="w-4 h-4" />
-                      <span>Search Purchase Orders...</span>
-                    </div>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[400px] p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search by PO reference or customer..." />
-                  <CommandList>
-                    <CommandEmpty>No purchase orders found.</CommandEmpty>
-                    <CommandGroup>
-                      {mockPurchaseOrders.map((po) => (
-                        <CommandItem
-                          key={po.id}
-                          onSelect={() => {
-                            setSelectedPO(po);
-                            setPoSearchOpen(false);
-                            if (!title) {
-                              setTitle(`${po.customer} Delivery`);
-                            }
-                          }}
-                          className="cursor-pointer"
-                        >
-                          <div className="flex flex-col gap-1 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">PO: {po.reference}</span>
-                              <Badge variant={po.status === 'in_transit' ? 'default' : 'secondary'} className="text-xs">
-                                {po.status}
-                              </Badge>
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {po.customer} • {po.items} items
-                            </div>
+            <Label>Link to CartonCloud PO</Label>
+            {!isCartonCloudConnected ? (
+              <div className="p-3 bg-muted/50 border border-border rounded-md text-sm text-muted-foreground">
+                CartonCloud is not connected. Configure it in Settings → Integration to search for Purchase Orders.
+              </div>
+            ) : (
+              <>
+                <Popover open={poSearchOpen} onOpenChange={setPoSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                    >
+                      {selectedPO ? (
+                        <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4 text-accent" />
+                          <span>PO: {selectedPO.reference}</span>
+                          <span className="text-muted-foreground">- {selectedPO.customer}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Search className="w-4 h-4" />
+                          <span>Search Purchase Orders...</span>
+                        </div>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput 
+                        placeholder="Type PO number or customer name..." 
+                        value={searchTerm}
+                        onValueChange={setSearchTerm}
+                      />
+                      <CommandList>
+                        {searchOrders.isPending && (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                            <span className="ml-2 text-sm text-muted-foreground">Searching...</span>
                           </div>
-                          <ExternalLink className="w-4 h-4 text-muted-foreground" />
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-            {selectedPO && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedPO(null)}
-                className="text-muted-foreground"
-              >
-                <X className="w-3 h-3 mr-1" /> Remove PO
-              </Button>
+                        )}
+                        {!searchOrders.isPending && searchTerm.length < 2 && (
+                          <div className="py-4 text-center text-sm text-muted-foreground">
+                            Type at least 2 characters to search
+                          </div>
+                        )}
+                        {!searchOrders.isPending && searchTerm.length >= 2 && searchResults.length === 0 && (
+                          <CommandEmpty>No purchase orders found.</CommandEmpty>
+                        )}
+                        {searchResults.length > 0 && (
+                          <CommandGroup>
+                            {searchResults.map((po) => (
+                              <CommandItem
+                                key={po.id}
+                                onSelect={() => {
+                                  setSelectedPO(po);
+                                  setPoSearchOpen(false);
+                                  if (!title) {
+                                    setTitle(`${po.customer} Delivery`);
+                                  }
+                                }}
+                                className="cursor-pointer"
+                              >
+                                <div className="flex flex-col gap-1 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">PO: {po.reference}</span>
+                                    <Badge variant={getStatusBadgeVariant(po.status)} className="text-xs">
+                                      {po.status}
+                                    </Badge>
+                                  </div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {po.customer} • {po.itemCount} items
+                                    {po.arrivalDate && ` • ETA: ${po.arrivalDate}`}
+                                  </div>
+                                </div>
+                                <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {selectedPO && (
+                  <div className="flex items-center justify-between p-3 bg-accent/5 border border-accent/20 rounded-md">
+                    <div className="space-y-1">
+                      <div className="font-medium text-sm">PO: {selectedPO.reference}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {selectedPO.customer} • {selectedPO.status}
+                        {selectedPO.arrivalDate && ` • ETA: ${selectedPO.arrivalDate}`}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedPO(null)}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
 

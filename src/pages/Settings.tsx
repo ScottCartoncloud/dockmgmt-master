@@ -1,5 +1,6 @@
 import { Header } from '@/components/Header';
 import { DockConfiguration } from '@/components/settings/DockConfiguration';
+import { CartonCloudIntegration } from '@/components/settings/CartonCloudIntegration';
 import { mockUser } from '@/data/mockData';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -47,16 +48,7 @@ const Settings = () => {
           <TabsContent value="integration">
             <Card>
               <CardContent className="pt-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Link2 className="w-5 h-5 text-accent" />
-                  <h2 className="text-xl font-semibold text-foreground">CartonCloud Integration</h2>
-                </div>
-                <p className="text-muted-foreground">
-                  Configure your CartonCloud API connection and sync options.
-                </p>
-                <div className="mt-6 p-8 border-2 border-dashed border-border rounded-lg text-center text-muted-foreground">
-                  Coming soon in a future update.
-                </div>
+                <CartonCloudIntegration />
               </CardContent>
             </Card>
           </TabsContent>

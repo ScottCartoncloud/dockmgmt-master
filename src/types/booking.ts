@@ -12,8 +12,18 @@ export interface PurchaseOrder {
   reference: string;
   customer: string;
   items: number;
-  status: 'pending' | 'in_transit' | 'delivered';
-  expectedDate: Date;
+  status: 'pending' | 'in_transit' | 'delivered' | string;
+  expectedDate: Date | null;
+}
+
+export interface CartonCloudPO {
+  id: string;
+  reference: string;
+  customer: string;
+  status: string;
+  arrivalDate: string | null;
+  itemCount: number;
+  warehouseName: string;
 }
 
 export interface CrossDockBooking {
@@ -27,6 +37,7 @@ export interface CrossDockBooking {
   dockNumber?: number;
   purchaseOrderId?: string;
   purchaseOrder?: PurchaseOrder;
+  cartonCloudPO?: CartonCloudPO;
   notes?: string;
   status: 'scheduled' | 'arrived' | 'in_progress' | 'completed' | 'cancelled';
   createdBy: string;

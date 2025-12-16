@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      cartoncloud_settings: {
+        Row: {
+          client_id: string
+          client_secret: string
+          created_at: string
+          id: string
+          is_active: boolean
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          client_secret: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          client_secret?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       dock_doors: {
         Row: {
           color: string

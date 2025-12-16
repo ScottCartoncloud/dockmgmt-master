@@ -1,1 +1,4 @@
 project_id = "gaxxwzlmykymqcgrlcqr"
+
+[functions.cartoncloud]
+verify_jwt = false
