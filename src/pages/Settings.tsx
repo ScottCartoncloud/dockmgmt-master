@@ -6,8 +6,16 @@ import { mockUser } from '@/data/mockData';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DoorOpen, Link2, Users, Clock, LayoutGrid } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 
 const Settings = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'docks';
+
+  const handleTabChange = (value: string) => {
+    setSearchParams({ tab: value });
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header user={mockUser} />
@@ -18,7 +26,7 @@ const Settings = () => {
           <p className="text-muted-foreground">Manage your CrossDock platform configuration.</p>
         </div>
 
-        <Tabs defaultValue="docks" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
             <TabsTrigger value="docks" className="gap-2">
               <DoorOpen className="w-4 h-4" />
