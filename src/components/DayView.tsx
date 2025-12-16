@@ -54,7 +54,16 @@ export function DayView({
     
     if (bookingData && onBookingMove) {
       const booking = JSON.parse(bookingData) as CrossDockBooking;
-      onBookingMove(booking, date, hour, offsetMinutes);
+      
+      // Calculate exact drop position within the hour slot
+      const rect = e.currentTarget.getBoundingClientRect();
+      const yWithinSlot = e.clientY - rect.top;
+      const minutesWithinHour = Math.round((yWithinSlot / HOUR_HEIGHT) * 60);
+      const totalDropMinutes = hour * 60 + minutesWithinHour;
+      
+      // Pass the precise drop position as a fractional hour
+      const preciseDropHour = totalDropMinutes / 60;
+      onBookingMove(booking, date, preciseDropHour, offsetMinutes);
     }
   };
 
