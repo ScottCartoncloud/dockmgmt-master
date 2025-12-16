@@ -1,17 +1,30 @@
 import { CrossDockBooking } from '@/types/booking';
 import { HOURS } from '@/data/mockData';
-import { BookingCard } from './BookingCard';
+import { DraggableBookingCard } from './DraggableBookingCard';
 import { format, isSameDay } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useState, DragEvent } from 'react';
 
 interface DayViewProps {
   date: Date;
   bookings: CrossDockBooking[];
   onTimeSlotClick: (date: Date, hour: number) => void;
   onBookingClick: (booking: CrossDockBooking) => void;
+  onBookingMove?: (booking: CrossDockBooking, newDate: Date, newHour: number) => void;
+  onBookingResize?: (booking: CrossDockBooking, newEndTime: string) => void;
 }
 
-export function DayView({ date, bookings, onTimeSlotClick, onBookingClick }: DayViewProps) {
+export function DayView({ 
+  date, 
+  bookings, 
+  onTimeSlotClick, 
+  onBookingClick,
+  onBookingMove,
+  onBookingResize
+}: DayViewProps) {
+  const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
+  const [draggingBooking, setDraggingBooking] = useState<CrossDockBooking | null>(null);
+  
   const dayBookings = bookings.filter((b) => isSameDay(b.date, date));
 
   const getBookingsForHour = (hour: number) => {
@@ -24,6 +37,27 @@ export function DayView({ date, bookings, onTimeSlotClick, onBookingClick }: Day
   const isCurrentHour = (hour: number) => {
     const now = new Date();
     return isSameDay(date, now) && now.getHours() === hour;
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>, hour: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverSlot(hour);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverSlot(null);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>, hour: number) => {
+    e.preventDefault();
+    setDragOverSlot(null);
+    
+    const bookingData = e.dataTransfer.getData('bookingData');
+    if (bookingData && onBookingMove) {
+      const booking = JSON.parse(bookingData) as CrossDockBooking;
+      onBookingMove(booking, date, hour);
+    }
   };
 
   return (
@@ -56,17 +90,26 @@ export function DayView({ date, bookings, onTimeSlotClick, onBookingClick }: Day
               </div>
               <div
                 className={cn(
-                  'flex-1 h-[60px] p-2 cursor-pointer transition-colors hover:bg-muted/50 overflow-hidden',
-                  isCurrentHour(hour) && 'bg-accent/5'
+                  'flex-1 h-[60px] p-2 cursor-pointer transition-colors overflow-hidden',
+                  isCurrentHour(hour) && 'bg-accent/5',
+                  dragOverSlot === hour && 'bg-accent/20 ring-2 ring-accent ring-inset',
+                  !dragOverSlot && 'hover:bg-muted/50'
                 )}
                 onClick={() => onTimeSlotClick(date, hour)}
+                onDragOver={(e) => handleDragOver(e, hour)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, hour)}
               >
                 <div className="space-y-1 overflow-y-auto max-h-full">
                   {getBookingsForHour(hour).map((booking) => (
-                    <BookingCard
+                    <DraggableBookingCard
                       key={booking.id}
                       booking={booking}
                       onClick={onBookingClick}
+                      onDragStart={setDraggingBooking}
+                      onDragEnd={() => setDraggingBooking(null)}
+                      onResize={onBookingResize}
+                      isDragging={draggingBooking?.id === booking.id}
                     />
                   ))}
                 </div>

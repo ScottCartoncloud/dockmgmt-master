@@ -8,6 +8,7 @@ import { WeekView } from '@/components/WeekView';
 import { BookingModal } from '@/components/BookingModal';
 import { Sidebar } from '@/components/Sidebar';
 import { toast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 const Index = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -82,6 +83,46 @@ const Index = () => {
     });
   };
 
+  const handleBookingMove = (booking: CrossDockBooking, newDate: Date, newHour: number) => {
+    // Calculate the duration of the booking
+    const startHour = parseInt(booking.startTime.split(':')[0]);
+    const startMinutes = parseInt(booking.startTime.split(':')[1]);
+    const endHour = parseInt(booking.endTime.split(':')[0]);
+    const endMinutes = parseInt(booking.endTime.split(':')[1]);
+    
+    const durationHours = endHour - startHour;
+    const newEndHour = Math.min(23, newHour + durationHours);
+    
+    const newStartTime = `${newHour.toString().padStart(2, '0')}:${startMinutes.toString().padStart(2, '0')}`;
+    const newEndTime = `${newEndHour.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
+    
+    setBookings((prev) =>
+      prev.map((b) =>
+        b.id === booking.id
+          ? { ...b, date: newDate, startTime: newStartTime, endTime: newEndTime }
+          : b
+      )
+    );
+    
+    toast({
+      title: 'Booking Moved',
+      description: `${booking.title} moved to ${format(newDate, 'EEE, MMM d')} at ${newStartTime}`,
+    });
+  };
+
+  const handleBookingResize = (booking: CrossDockBooking, newEndTime: string) => {
+    setBookings((prev) =>
+      prev.map((b) =>
+        b.id === booking.id ? { ...b, endTime: newEndTime } : b
+      )
+    );
+    
+    toast({
+      title: 'Booking Duration Changed',
+      description: `${booking.title} now ends at ${newEndTime}`,
+    });
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header user={mockUser} />
@@ -103,6 +144,8 @@ const Index = () => {
                 bookings={bookings}
                 onTimeSlotClick={handleTimeSlotClick}
                 onBookingClick={handleBookingClick}
+                onBookingMove={handleBookingMove}
+                onBookingResize={handleBookingResize}
               />
             ) : (
               <WeekView
@@ -110,6 +153,8 @@ const Index = () => {
                 bookings={bookings}
                 onTimeSlotClick={handleTimeSlotClick}
                 onBookingClick={handleBookingClick}
+                onBookingMove={handleBookingMove}
+                onBookingResize={handleBookingResize}
               />
             )}
           </div>
