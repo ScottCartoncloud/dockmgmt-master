@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CrossDockBooking } from '@/types/booking';
-import { format, isToday, isTomorrow } from 'date-fns';
+import { format, isToday, isTomorrow, startOfDay, isAfter } from 'date-fns';
 import { Calendar, Clock, Package, Truck, Info, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -33,29 +33,33 @@ export function Sidebar({ bookings, onBookingClick }: SidebarProps) {
     localStorage.setItem('sidebar-collapsed', JSON.stringify(collapsed));
   }, [collapsed]);
 
-  const today = new Date();
+  const today = startOfDay(new Date());
+  
+  // Today's bookings for stats
+  const todayBookings = bookings.filter((b) => isToday(b.date));
+  
+  const todayStats = {
+    total: todayBookings.length,
+    arrived: todayBookings.filter((b) => b.status === 'arrived').length,
+    pending: todayBookings.filter((b) => b.status !== 'arrived' && b.status !== 'cancelled').length,
+  };
+
+  // Upcoming bookings = AFTER today (not including today)
   const upcomingBookings = bookings
-    .filter((b) => b.date >= today && b.status !== 'completed' && b.status !== 'cancelled')
+    .filter((b) => isAfter(startOfDay(b.date), today) && b.status !== 'cancelled')
     .sort((a, b) => a.date.getTime() - b.date.getTime())
-    .slice(0, 10);
+    .slice(0, 5);
 
   const getDateLabel = (date: Date) => {
-    if (isToday(date)) return 'Today';
     if (isTomorrow(date)) return 'Tomorrow';
     return format(date, 'EEE, MMM d');
   };
 
-  const todayStats = {
-    total: bookings.filter((b) => isToday(b.date)).length,
-    arrived: bookings.filter((b) => isToday(b.date) && b.status === 'arrived').length,
-    scheduled: bookings.filter((b) => isToday(b.date) && b.status === 'scheduled').length,
-  };
-
-  // Filter bookings based on active filter
-  const filteredBookings = upcomingBookings.filter((booking) => {
+  // Filter upcoming bookings based on active filter (for today's bookings view when filtered)
+  const filteredTodayBookings = todayBookings.filter((booking) => {
     if (activeFilter === 'all') return true;
     if (activeFilter === 'arrived') return booking.status === 'arrived';
-    if (activeFilter === 'scheduled') return booking.status === 'scheduled';
+    if (activeFilter === 'scheduled') return booking.status !== 'arrived' && booking.status !== 'cancelled';
     return true;
   });
 
@@ -150,7 +154,7 @@ export function Sidebar({ bookings, onBookingClick }: SidebarProps) {
           />
           <StatCard
             label="Pending"
-            value={todayStats.scheduled}
+            value={todayStats.pending}
             filter="scheduled"
             className="bg-accent/10"
           />
@@ -165,35 +169,89 @@ export function Sidebar({ bookings, onBookingClick }: SidebarProps) {
         )}
       </div>
 
-      {/* Upcoming Bookings */}
+      {/* Today's Bookings (when filtered) */}
+      {activeFilter !== 'all' && (
+        <div className="flex-1 flex flex-col min-h-0 border-b border-border">
+          <div className="px-4 py-3 border-b border-border">
+            <h3 className="font-semibold text-foreground flex items-center gap-2">
+              <Clock className="w-4 h-4 text-accent" />
+              {activeFilter === 'arrived' ? "Today's Arrived" : "Today's Pending"}
+              <Badge variant="secondary" className="ml-auto">
+                {filteredTodayBookings.length}
+              </Badge>
+            </h3>
+          </div>
+          <ScrollArea className="flex-1 max-h-48">
+            <div className="p-4 space-y-3">
+              {filteredTodayBookings.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground">
+                  <Info className="w-6 h-6 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No {activeFilter === 'arrived' ? 'arrived' : 'pending'} bookings today</p>
+                </div>
+              ) : (
+                filteredTodayBookings.map((booking) => (
+                  <div
+                    key={booking.id}
+                    onClick={() => onBookingClick(booking)}
+                    className="p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <span className="text-xs font-medium text-accent">Today</span>
+                      <Badge className={cn('text-xs', statusColors[booking.status])}>
+                        {booking.status}
+                      </Badge>
+                    </div>
+                    <div className="font-medium text-foreground text-sm truncate">
+                      {booking.title}
+                    </div>
+                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {booking.startTime}
+                      </span>
+                      {booking.carrier && (
+                        <span className="flex items-center gap-1 truncate">
+                          <Truck className="w-3 h-3" />
+                          {booking.carrier}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* Upcoming Bookings (after today) */}
       <div className="flex-1 flex flex-col min-h-0">
         <div className="px-4 py-3 border-b border-border">
           <h3 className="font-semibold text-foreground flex items-center gap-2">
             <Clock className="w-4 h-4 text-accent" />
-            {activeFilter === 'all' ? 'Upcoming Bookings' : 
-             activeFilter === 'arrived' ? 'Arrived Bookings' : 'Pending Bookings'}
+            Upcoming Bookings
             <Badge variant="secondary" className="ml-auto">
-              {filteredBookings.length}
+              {upcomingBookings.length}
             </Badge>
           </h3>
+          <p className="text-xs text-muted-foreground mt-1">Showing bookings after today</p>
         </div>
         <ScrollArea className="flex-1">
           <div className="p-4 space-y-3">
-            {filteredBookings.length === 0 ? (
+            {upcomingBookings.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Info className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">
-                  {activeFilter === 'all' 
-                    ? 'No upcoming bookings' 
-                    : `No ${activeFilter} bookings`}
-                </p>
+                <p className="text-sm">No upcoming bookings</p>
               </div>
             ) : (
-              filteredBookings.map((booking) => (
+              upcomingBookings.map((booking) => (
                 <div
                   key={booking.id}
                   onClick={() => onBookingClick(booking)}
-                  className="p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
+                  className={cn(
+                    "p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors",
+                    booking.status === 'completed' && "opacity-60"
+                  )}
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <span className="text-xs font-medium text-accent">
