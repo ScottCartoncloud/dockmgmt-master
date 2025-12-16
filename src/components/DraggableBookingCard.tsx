@@ -41,10 +41,16 @@ export function DraggableBookingCard({
     e.dataTransfer.setData('bookingData', JSON.stringify(booking));
     e.dataTransfer.effectAllowed = 'move';
     
-    // Create a drag image
+    // Calculate the click offset within the card (in minutes)
+    // 80px = 1 hour, so offset in minutes = (clickY / 80) * 60
     if (cardRef.current) {
       const rect = cardRef.current.getBoundingClientRect();
-      e.dataTransfer.setDragImage(cardRef.current, rect.width / 2, 20);
+      const clickOffsetY = e.clientY - rect.top;
+      const offsetMinutes = Math.round((clickOffsetY / 80) * 60);
+      e.dataTransfer.setData('offsetMinutes', offsetMinutes.toString());
+      
+      // Set drag image anchored at click point for visual accuracy
+      e.dataTransfer.setDragImage(cardRef.current, rect.width / 2, clickOffsetY);
     }
     
     onDragStart?.(booking);

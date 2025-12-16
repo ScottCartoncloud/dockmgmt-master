@@ -83,18 +83,30 @@ const Index = () => {
     });
   };
 
-  const handleBookingMove = (booking: CrossDockBooking, newDate: Date, newHour: number) => {
-    // Calculate the duration of the booking
-    const startHour = parseInt(booking.startTime.split(':')[0]);
-    const startMinutes = parseInt(booking.startTime.split(':')[1]);
-    const endHour = parseInt(booking.endTime.split(':')[0]);
-    const endMinutes = parseInt(booking.endTime.split(':')[1]);
+  const handleBookingMove = (booking: CrossDockBooking, newDate: Date, dropHour: number, offsetMinutes: number) => {
+    // Calculate the duration of the booking in minutes
+    const [startH, startM] = booking.startTime.split(':').map(Number);
+    const [endH, endM] = booking.endTime.split(':').map(Number);
+    const durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
     
-    const durationHours = endHour - startHour;
-    const newEndHour = Math.min(23, newHour + durationHours);
+    // Calculate the new start time by subtracting the click offset from the drop position
+    // dropHour is where the mouse was released, offsetMinutes is how far into the booking they clicked
+    const dropMinutes = dropHour * 60;
+    const newStartMinutes = Math.max(0, dropMinutes - offsetMinutes);
     
-    const newStartTime = `${newHour.toString().padStart(2, '0')}:${startMinutes.toString().padStart(2, '0')}`;
-    const newEndTime = `${newEndHour.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
+    // Snap to 15-minute intervals
+    const snappedStartMinutes = Math.round(newStartMinutes / 15) * 15;
+    
+    // Calculate end time
+    const newEndMinutes = Math.min(23 * 60 + 59, snappedStartMinutes + durationMinutes);
+    
+    const newStartHour = Math.floor(snappedStartMinutes / 60);
+    const newStartMin = snappedStartMinutes % 60;
+    const newEndHour = Math.floor(newEndMinutes / 60);
+    const newEndMin = newEndMinutes % 60;
+    
+    const newStartTime = `${newStartHour.toString().padStart(2, '0')}:${newStartMin.toString().padStart(2, '0')}`;
+    const newEndTime = `${newEndHour.toString().padStart(2, '0')}:${newEndMin.toString().padStart(2, '0')}`;
     
     setBookings((prev) =>
       prev.map((b) =>
