@@ -1,5 +1,20 @@
 import { User } from '@/types/booking';
-import { Bell, ChevronDown, LogOut, Search, Truck } from 'lucide-react';
+import { 
+  Bell, 
+  ChevronDown, 
+  Search, 
+  Truck, 
+  Calendar,
+  BarChart3,
+  Settings,
+  DoorOpen,
+  Link2,
+  Users,
+  Clock,
+  FileText,
+  Activity,
+  TrendingUp
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -8,8 +23,8 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
 
 interface HeaderProps {
   user: User;
@@ -70,59 +85,79 @@ export function Header({ user }: HeaderProps) {
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex items-center gap-1 px-4 py-2">
-        <Button variant="ghost" className="text-header-foreground hover:bg-header-foreground/10">
+      {/* Navigation - Centered */}
+      <nav className="flex items-center justify-center gap-2 px-4 py-2">
+        <Button variant="ghost" className="text-header-foreground hover:bg-header-foreground/10 gap-2">
+          <Calendar className="w-4 h-4" />
           Dashboard
         </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="text-header-foreground hover:bg-header-foreground/10">
-              + Quick Add <ChevronDown className="w-4 h-4 ml-1" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem>New Booking</DropdownMenuItem>
-            <DropdownMenuItem>New PO Reference</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="text-header-foreground hover:bg-header-foreground/10">
-              Transport <ChevronDown className="w-4 h-4 ml-1" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem>Inbound</DropdownMenuItem>
-            <DropdownMenuItem>Outbound</DropdownMenuItem>
-            <DropdownMenuItem>Cross Dock</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="text-header-foreground hover:bg-header-foreground/10">
-              Warehouse <ChevronDown className="w-4 h-4 ml-1" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem>Dock Schedule</DropdownMenuItem>
-            <DropdownMenuItem>Inventory</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="text-header-foreground hover:bg-header-foreground/10">
-              Reports <ChevronDown className="w-4 h-4 ml-1" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem>Daily Summary</DropdownMenuItem>
-            <DropdownMenuItem>Performance</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Button variant="ghost" className="text-header-foreground hover:bg-header-foreground/10">
-          Contacts
+        
+        <span className="text-header-foreground/30">|</span>
+        
+        <Button variant="ghost" className="text-header-foreground hover:bg-header-foreground/10 gap-2">
+          <Truck className="w-4 h-4" />
+          Bookings
         </Button>
+        
+        <span className="text-header-foreground/30">|</span>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="text-header-foreground hover:bg-header-foreground/10 gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Reports
+              <ChevronDown className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center" className="w-56">
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Analytics & Insights</DropdownMenuLabel>
+            <DropdownMenuItem className="gap-2">
+              <FileText className="w-4 h-4" />
+              Booking History
+            </DropdownMenuItem>
+            <DropdownMenuItem className="gap-2">
+              <Activity className="w-4 h-4" />
+              Dock Utilization
+            </DropdownMenuItem>
+            <DropdownMenuItem className="gap-2">
+              <TrendingUp className="w-4 h-4" />
+              Carrier Performance
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        
+        <span className="text-header-foreground/30">|</span>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="text-header-foreground hover:bg-header-foreground/10 gap-2">
+              <Settings className="w-4 h-4" />
+              Settings
+              <ChevronDown className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center" className="w-56">
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Configuration</DropdownMenuLabel>
+            <DropdownMenuItem className="gap-2">
+              <DoorOpen className="w-4 h-4" />
+              Dock Configuration
+            </DropdownMenuItem>
+            <DropdownMenuItem className="gap-2">
+              <Link2 className="w-4 h-4" />
+              CartonCloud Integration
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Administration</DropdownMenuLabel>
+            <DropdownMenuItem className="gap-2">
+              <Users className="w-4 h-4" />
+              User & Role Management
+            </DropdownMenuItem>
+            <DropdownMenuItem className="gap-2">
+              <Clock className="w-4 h-4" />
+              Booking Defaults
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </nav>
     </header>
   );
