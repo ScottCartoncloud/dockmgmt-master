@@ -44,6 +44,42 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_booking_fields: {
+        Row: {
+          created_at: string
+          field_type: string
+          id: string
+          is_active: boolean
+          is_required: boolean
+          label: string
+          options: Json | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          field_type: string
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          label: string
+          options?: Json | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          field_type?: string
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          label?: string
+          options?: Json | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       dock_doors: {
         Row: {
           color: string

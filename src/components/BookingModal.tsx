@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CrossDockBooking, CartonCloudPO } from '@/types/booking';
+import { CrossDockBooking, CartonCloudPO, CustomFieldValues } from '@/types/booking';
 import { format } from 'date-fns';
 import { X, Search, Package, ExternalLink, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,8 @@ import { cn } from '@/lib/utils';
 import { useSearchCartonCloudOrders, useCartonCloudSettings } from '@/hooks/useCartonCloudSettings';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 import { useDockDoors } from '@/hooks/useDockDoors';
+import { useActiveCustomBookingFields } from '@/hooks/useCustomBookingFields';
+import { CustomFieldsRenderer } from '@/components/CustomFieldsRenderer';
 
 interface BookingModalProps {
   open: boolean;
@@ -72,9 +74,11 @@ export function BookingModal({
   const [poSearchOpen, setPoSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<CartonCloudPO[]>([]);
+  const [customFieldValues, setCustomFieldValues] = useState<CustomFieldValues>({});
 
   const { data: cartonCloudSettings } = useCartonCloudSettings();
   const { data: dockDoors } = useDockDoors();
+  const { data: customFields } = useActiveCustomBookingFields();
   const searchOrders = useSearchCartonCloudOrders();
   const isCartonCloudConnected = !!cartonCloudSettings;
   const activeDocks = dockDoors?.filter(d => d.is_active) || [];
@@ -112,6 +116,7 @@ export function BookingModal({
       setNotes(booking.notes || '');
       setStatus(booking.status);
       setSelectedPO(booking.cartonCloudPO || null);
+      setCustomFieldValues(booking.customFields || {});
     } else {
       // Reset form for new booking
       setTitle('');
@@ -124,6 +129,7 @@ export function BookingModal({
       setNotes('');
       setStatus('scheduled');
       setSelectedPO(null);
+      setCustomFieldValues({});
     }
     setSearchTerm('');
     setSearchResults([]);
@@ -131,6 +137,21 @@ export function BookingModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check required custom fields
+    const missingRequired = customFields?.filter(field => {
+      if (!field.is_required) return false;
+      const value = customFieldValues[field.id];
+      if (value === null || value === undefined) return true;
+      if (typeof value === 'string' && !value.trim()) return true;
+      if (Array.isArray(value) && value.length === 0) return true;
+      return false;
+    });
+    
+    if (missingRequired && missingRequired.length > 0) {
+      // Could show validation toast here
+      return;
+    }
     
     onSave({
       id: booking?.id,
@@ -145,6 +166,7 @@ export function BookingModal({
       cartonCloudPO: selectedPO || undefined,
       notes: notes || undefined,
       status,
+      customFields: Object.keys(customFieldValues).length > 0 ? customFieldValues : undefined,
     });
     
     onClose();
@@ -401,6 +423,15 @@ export function BookingModal({
               </Select>
             </div>
           </div>
+
+          {/* Custom Fields */}
+          {customFields && customFields.length > 0 && (
+            <CustomFieldsRenderer
+              fields={customFields}
+              values={customFieldValues}
+              onChange={setCustomFieldValues}
+            />
+          )}
 
           {/* Notes */}
           <div className="space-y-2">
