@@ -1,5 +1,5 @@
 import { CrossDockBooking, CartonCloudPO } from '@/types/booking';
-import { Clock, Truck, Package, GripVertical, Cloud } from 'lucide-react';
+import { Clock, Truck, Package, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useRef, DragEvent } from 'react';
 import {
@@ -8,6 +8,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import cartonCloudLogo from '@/assets/cartoncloud-logo.png';
 
 interface DraggableBookingCardProps {
   booking: CrossDockBooking;
@@ -175,9 +176,11 @@ export function DraggableBookingCard({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="w-4 h-4 bg-accent/20 rounded flex items-center justify-center">
-                  <Cloud className="w-3 h-3 text-accent" />
-                </div>
+                <img 
+                  src={cartonCloudLogo} 
+                  alt="CartonCloud" 
+                  className="w-4 h-4 object-contain"
+                />
               </TooltipTrigger>
               <TooltipContent>
                 <p>Linked to CartonCloud PO</p>
