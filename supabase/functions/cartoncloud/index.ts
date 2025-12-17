@@ -203,7 +203,7 @@ serve(async (req) => {
         );
       }
 
-      const results = await searchInboundOrders(accessToken, settings.tenant_id, searchTerm);
+      const results = await searchInboundOrders(accessToken, settings.cartoncloud_tenant_id, searchTerm);
       
       // Transform results to a simpler format
       const transformedResults = results.map((order: any) => ({

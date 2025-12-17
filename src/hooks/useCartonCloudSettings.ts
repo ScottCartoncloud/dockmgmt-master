@@ -5,7 +5,8 @@ export interface CartonCloudSettings {
   id: string;
   client_id: string;
   client_secret: string;
-  tenant_id: string;
+  cartoncloud_tenant_id: string;
+  tenant_id: string | null; // app multi-tenancy
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -30,7 +31,7 @@ export function useSaveCartonCloudSettings() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (settings: { client_id: string; client_secret: string; tenant_id: string }) => {
+    mutationFn: async (settings: { client_id: string; client_secret: string; cartoncloud_tenant_id: string }) => {
       // First check if settings exist
       const { data: existing } = await supabase
         .from('cartoncloud_settings')
@@ -44,7 +45,7 @@ export function useSaveCartonCloudSettings() {
           .update({
             client_id: settings.client_id,
             client_secret: settings.client_secret,
-            tenant_id: settings.tenant_id,
+            cartoncloud_tenant_id: settings.cartoncloud_tenant_id,
             is_active: true,
           })
           .eq('id', existing.id)
@@ -60,7 +61,7 @@ export function useSaveCartonCloudSettings() {
           .insert({
             client_id: settings.client_id,
             client_secret: settings.client_secret,
-            tenant_id: settings.tenant_id,
+            cartoncloud_tenant_id: settings.cartoncloud_tenant_id,
             is_active: true,
           })
           .select()
