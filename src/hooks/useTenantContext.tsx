@@ -27,7 +27,10 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   // Fetch tenants based on user role
   useEffect(() => {
     async function fetchTenants() {
+      console.log('[TenantContext] Fetching tenants, user:', user?.id, 'isSuperUser:', isSuperUser);
+      
       if (!user) {
+        console.log('[TenantContext] No user, clearing tenants');
         setTenants([]);
         setActiveTenantState(null);
         setIsLoading(false);
@@ -37,15 +40,21 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       try {
         if (isSuperUser) {
+          console.log('[TenantContext] Super user - fetching all tenants');
           // Super users can see all tenants
           const { data, error } = await supabase
             .from('tenants')
             .select('id, name')
             .order('name');
           
-          if (error) throw error;
+          if (error) {
+            console.error('[TenantContext] Error fetching tenants:', error);
+            throw error;
+          }
+          console.log('[TenantContext] Fetched tenants:', data);
           setTenants(data || []);
         } else if (profile?.tenant_id) {
+          console.log('[TenantContext] Regular user - fetching tenant:', profile.tenant_id);
           // Regular users can only see their own tenant
           const { data, error } = await supabase
             .from('tenants')
@@ -53,13 +62,17 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
             .eq('id', profile.tenant_id)
             .single();
           
-          if (error) throw error;
+          if (error) {
+            console.error('[TenantContext] Error fetching tenant:', error);
+            throw error;
+          }
           setTenants(data ? [data] : []);
         } else {
+          console.log('[TenantContext] No tenant_id and not super user');
           setTenants([]);
         }
       } catch (error) {
-        console.error('Error fetching tenants:', error);
+        console.error('[TenantContext] Error fetching tenants:', error);
         setTenants([]);
       } finally {
         setIsLoading(false);
