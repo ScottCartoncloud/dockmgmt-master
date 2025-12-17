@@ -119,19 +119,38 @@ export function UserManagement() {
     mutationFn: async ({ name, email, role }: { name: string; email: string; role: AppRole }) => {
       if (!activeTenant?.id) throw new Error('No tenant selected');
 
-      // Create invite record
-      const { error } = await supabase
+      // Create invite record and get the ID
+      const { data: invite, error } = await supabase
         .from('tenant_invites')
         .insert({
           email,
           tenant_id: activeTenant.id,
           role,
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
+
+      // Send invite email via edge function
+      const { error: emailError } = await supabase.functions.invoke('send-invite-email', {
+        body: {
+          email,
+          inviteToken: invite.id,
+          tenantName: activeTenant.name,
+          role: roleLabels[role],
+          appUrl: window.location.origin,
+        },
+      });
+
+      if (emailError) {
+        console.error('Failed to send invite email:', emailError);
+        // Don't throw - invite was created, email sending is secondary
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenant-users'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-invites'] });
       toast({
         title: 'Invitation Sent',
         description: `An invitation has been sent to ${newUserEmail}.`,
