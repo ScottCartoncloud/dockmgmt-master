@@ -118,20 +118,16 @@ export function Header() {
               <Link2 className="w-4 h-4" />
               CartonCloud Integration
             </DropdownMenuItem>
-            {isAdmin && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-xs text-muted-foreground">Administration</DropdownMenuLabel>
-                <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=users')}>
-                  <Users className="w-4 h-4" />
-                  User & Role Management
-                </DropdownMenuItem>
-                <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=defaults')}>
-                  <Clock className="w-4 h-4" />
-                  Booking Defaults
-                </DropdownMenuItem>
-              </>
-            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Administration</DropdownMenuLabel>
+            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=users')}>
+              <Users className="w-4 h-4" />
+              User Management
+            </DropdownMenuItem>
+            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=defaults')}>
+              <Clock className="w-4 h-4" />
+              Booking Defaults
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </nav>
