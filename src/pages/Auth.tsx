@@ -5,12 +5,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Mail, Lock, User, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import cartonCloudLogo from '@/assets/cartoncloud-logo.png';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -154,26 +155,36 @@ export default function Auth() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-accent" />
+      <div className="min-h-screen flex items-center justify-center bg-header">
+        <Loader2 className="w-8 h-8 animate-spin text-white" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20 p-4">
-      <Card className="w-full max-w-md border-border/50 shadow-xl">
-        <CardHeader className="text-center pb-2">
-          <CardTitle className="text-2xl font-bold text-foreground">Cross Dock</CardTitle>
-          <CardDescription>
-            {inviteInfo 
-              ? `You've been invited to join ${inviteInfo.tenantName}`
-              : 'Sign in to manage your dock bookings'
-            }
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-header p-4">
+      {/* Logo and Branding */}
+      <div className="mb-8 text-center">
+        <img 
+          src={cartonCloudLogo} 
+          alt="CartonCloud" 
+          className="h-12 mx-auto mb-4"
+        />
+        <h1 className="text-4xl font-bold text-white mb-1">Docks</h1>
+        <p className="text-header-foreground/70 text-sm">By CartonCloud</p>
+      </div>
+
+      {/* Login Card */}
+      <Card className="w-full max-w-md border-0 shadow-2xl">
+        <CardContent className="pt-6">
+          {inviteInfo && (
+            <div className="mb-4 p-3 bg-accent/10 rounded-lg text-center">
+              <p className="text-sm text-foreground">
+                You've been invited to join <strong>{inviteInfo.tenantName}</strong>
+              </p>
+            </div>
+          )}
+          
           {error && (
             <Alert variant="destructive" className="mb-4">
               <AlertCircle className="h-4 w-4" />
