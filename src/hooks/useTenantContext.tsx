@@ -90,11 +90,31 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (tenants.length === 0) return;
 
+    // In dev mode, always ensure a tenant is selected
+    if (DEV_BYPASS_AUTH) {
+      const stored = localStorage.getItem(ACTIVE_TENANT_KEY);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          const found = tenants.find(t => t.id === parsed.id);
+          if (found) {
+            setActiveTenantState(found);
+            return;
+          }
+        } catch {
+          // Invalid stored data
+        }
+      }
+      // Auto-select first tenant in dev mode
+      setActiveTenantState(tenants[0]);
+      localStorage.setItem(ACTIVE_TENANT_KEY, JSON.stringify(tenants[0]));
+      return;
+    }
+
     const stored = localStorage.getItem(ACTIVE_TENANT_KEY);
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        // Verify the stored tenant is in the available list
         const found = tenants.find(t => t.id === parsed.id);
         if (found) {
           setActiveTenantState(found);
@@ -105,12 +125,8 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Default to first available tenant or user's tenant
-    if (DEV_BYPASS_AUTH && tenants.length > 0) {
-      // In dev mode, auto-select first tenant
-      setActiveTenantState(tenants[0]);
-      localStorage.setItem(ACTIVE_TENANT_KEY, JSON.stringify(tenants[0]));
-    } else if (!isSuperUser && profile?.tenant_id) {
+    // Default to user's tenant or single tenant
+    if (!isSuperUser && profile?.tenant_id) {
       const userTenant = tenants.find(t => t.id === profile.tenant_id);
       if (userTenant) {
         setActiveTenantState(userTenant);
