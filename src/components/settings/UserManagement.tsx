@@ -133,7 +133,15 @@ export function UserManagement() {
       if (error) throw error;
 
       // Send invite email via edge function
-      const { error: emailError } = await supabase.functions.invoke('send-invite-email', {
+      console.log('Calling send-invite-email edge function with:', {
+        email,
+        inviteToken: invite.id,
+        tenantName: activeTenant.name,
+        role: roleLabels[role],
+        appUrl: window.location.origin,
+      });
+
+      const { data: emailData, error: emailError } = await supabase.functions.invoke('send-invite-email', {
         body: {
           email,
           inviteToken: invite.id,
@@ -142,6 +150,8 @@ export function UserManagement() {
           appUrl: window.location.origin,
         },
       });
+
+      console.log('Edge function response:', { emailData, emailError });
 
       if (emailError) {
         console.error('Failed to send invite email:', emailError);
