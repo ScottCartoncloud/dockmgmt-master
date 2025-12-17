@@ -18,6 +18,9 @@ const TenantContext = createContext<TenantContextType | undefined>(undefined);
 
 const ACTIVE_TENANT_KEY = 'crossdock_active_tenant';
 
+// Dev mode bypass - allows tenant selection without auth
+const DEV_BYPASS_AUTH = true;
+
 export function TenantProvider({ children }: { children: React.ReactNode }) {
   const { user, isSuperUser, profile } = useAuth();
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -27,10 +30,11 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   // Fetch tenants based on user role
   useEffect(() => {
     async function fetchTenants() {
-      console.log('[TenantContext] Fetching tenants, user:', user?.id, 'isSuperUser:', isSuperUser);
+      console.log('[TenantContext] Fetching tenants, user:', user?.id, 'isSuperUser:', isSuperUser, 'devMode:', DEV_BYPASS_AUTH);
       
-      if (!user) {
-        console.log('[TenantContext] No user, clearing tenants');
+      // In dev mode, fetch all tenants even without a user
+      if (!user && !DEV_BYPASS_AUTH) {
+        console.log('[TenantContext] No user and not in dev mode, clearing tenants');
         setTenants([]);
         setActiveTenantState(null);
         setIsLoading(false);
@@ -39,9 +43,9 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
 
       setIsLoading(true);
       try {
-        if (isSuperUser) {
-          console.log('[TenantContext] Super user - fetching all tenants');
-          // Super users can see all tenants
+        // In dev mode or as super user, fetch all tenants
+        if (DEV_BYPASS_AUTH || isSuperUser) {
+          console.log('[TenantContext] Fetching all tenants (dev mode or super user)');
           const { data, error } = await supabase
             .from('tenants')
             .select('id, name')
@@ -102,7 +106,11 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Default to first available tenant or user's tenant
-    if (!isSuperUser && profile?.tenant_id) {
+    if (DEV_BYPASS_AUTH && tenants.length > 0) {
+      // In dev mode, auto-select first tenant
+      setActiveTenantState(tenants[0]);
+      localStorage.setItem(ACTIVE_TENANT_KEY, JSON.stringify(tenants[0]));
+    } else if (!isSuperUser && profile?.tenant_id) {
       const userTenant = tenants.find(t => t.id === profile.tenant_id);
       if (userTenant) {
         setActiveTenantState(userTenant);

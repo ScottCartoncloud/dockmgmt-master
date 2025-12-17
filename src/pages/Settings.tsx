@@ -2,6 +2,7 @@ import { Header } from '@/components/Header';
 import { DockConfiguration } from '@/components/settings/DockConfiguration';
 import { CartonCloudIntegration } from '@/components/settings/CartonCloudIntegration';
 import { CardConfiguration } from '@/components/settings/CardConfiguration';
+import { UserManagement } from '@/components/settings/UserManagement';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DoorOpen, Link2, Users, Clock, LayoutGrid } from 'lucide-react';
@@ -22,7 +23,7 @@ const Settings = () => {
       <div className="flex-1 p-6 max-w-5xl mx-auto w-full">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-          <p className="text-muted-foreground">Manage your CrossDock platform configuration.</p>
+          <p className="text-muted-foreground">Manage your Dock Management platform configuration.</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
@@ -76,16 +77,7 @@ const Settings = () => {
           <TabsContent value="users">
             <Card>
               <CardContent className="pt-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Users className="w-5 h-5 text-accent" />
-                  <h2 className="text-xl font-semibold text-foreground">User & Role Management</h2>
-                </div>
-                <p className="text-muted-foreground">
-                  Manage user accounts and assign roles for access control.
-                </p>
-                <div className="mt-6 p-8 border-2 border-dashed border-border rounded-lg text-center text-muted-foreground">
-                  Coming soon in a future update.
-                </div>
+                <UserManagement />
               </CardContent>
             </Card>
           </TabsContent>

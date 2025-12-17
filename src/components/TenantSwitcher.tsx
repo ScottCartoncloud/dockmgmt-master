@@ -49,11 +49,11 @@ export function TenantSwitcher() {
           </div>
           <div className="flex flex-col items-start">
             <span className="font-semibold text-lg text-header-foreground leading-tight">
-              {activeTenant?.name || 'CrossDock'}
+              {activeTenant?.name || 'Dock Management'}
             </span>
             {activeTenant && (
               <span className="text-[10px] text-header-foreground/60 leading-tight">
-                CrossDock
+                Dock Management
               </span>
             )}
           </div>
