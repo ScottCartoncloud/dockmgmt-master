@@ -332,10 +332,10 @@ export function DayView({
                       const style = getBookingStyle(booking);
                       const isDragging = draggingBooking?.id === booking.id;
                       const layout = dockLayouts.get(dock.id)?.get(booking.id);
-                      const layoutStyle = layout 
+                      const layoutStyle = layout
                         ? getBookingLayoutStyle(layout.column, layout.totalColumns, 4)
-                        : { left: '4px', width: 'calc(100% - 8px)' };
-                      
+                        : { left: '4px', right: '4px' };
+
                       return (
                         <div
                           key={booking.id}
@@ -347,7 +347,7 @@ export function DayView({
                             top: style.top,
                             height: style.height,
                             left: layoutStyle.left,
-                            width: layoutStyle.width,
+                            right: layoutStyle.right,
                           }}
                         >
                           <DraggableBookingCard
