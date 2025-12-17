@@ -9,7 +9,8 @@ import {
   Link2,
   Users,
   Clock,
-  LogOut
+  LogOut,
+  Shield
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,11 +29,12 @@ const roleLabels: Record<string, string> = {
   admin: 'Administrator',
   operator: 'Dock Operator',
   viewer: 'Viewer',
+  super_user: 'Super User',
 };
 
 export function Header() {
   const navigate = useNavigate();
-  const { user, profile, roles, signOut, isAdmin } = useAuth();
+  const { user, profile, roles, signOut, isAdmin, isSuperUser } = useAuth();
 
   const primaryRole = roles[0]?.role || 'viewer';
   const displayName = profile?.full_name || user?.email || 'User';
@@ -137,6 +139,20 @@ export function Header() {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {isSuperUser && (
+          <>
+            <span className="text-header-foreground/30">|</span>
+            <Button 
+              variant="ghost" 
+              className="text-header-foreground hover:bg-header-foreground/10 gap-2"
+              onClick={() => navigate('/admin')}
+            >
+              <Shield className="w-4 h-4" />
+              Admin
+            </Button>
+          </>
+        )}
       </nav>
     </header>
   );
