@@ -6,7 +6,7 @@ import { Loader2 } from 'lucide-react';
 interface ProtectedRouteProps {
   children: ReactNode;
   requireTenant?: boolean;
-  requiredRole?: 'admin' | 'operator' | 'viewer';
+  requiredRole?: 'admin' | 'operator' | 'viewer' | 'super_user';
 }
 
 export function ProtectedRoute({ 
