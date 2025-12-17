@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CalendarView, CrossDockBooking } from '@/types/booking';
-import { mockUser, mockBookings } from '@/data/mockData';
+import { mockBookings } from '@/data/mockData';
 import { Header } from '@/components/Header';
 import { CalendarHeader } from '@/components/CalendarHeader';
 import { DayView } from '@/components/DayView';
@@ -10,10 +10,12 @@ import { Sidebar } from '@/components/Sidebar';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { useDockDoors } from '@/hooks/useDockDoors';
+import { useAuth } from '@/hooks/useAuth';
 
 const STORAGE_KEY_VIEW = 'crossdock-calendar-view';
 
 const Index = () => {
+  const { user } = useAuth();
   const { data: dockDoors } = useDockDoors();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<CalendarView>(() => {
@@ -85,7 +87,7 @@ const Index = () => {
         purchaseOrder: bookingData.purchaseOrder,
         notes: bookingData.notes,
         status: bookingData.status || 'scheduled',
-        createdBy: mockUser.id,
+        createdBy: user?.id || 'unknown',
         createdAt: new Date(),
       };
       setBookings((prev) => [...prev, newBooking]);
@@ -169,7 +171,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <Header user={mockUser} />
+      <Header />
       
       <div className="flex-1 flex flex-col">
         <CalendarHeader
