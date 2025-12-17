@@ -2,7 +2,6 @@ import { Header } from '@/components/Header';
 import { DockConfiguration } from '@/components/settings/DockConfiguration';
 import { CartonCloudIntegration } from '@/components/settings/CartonCloudIntegration';
 import { CardConfiguration } from '@/components/settings/CardConfiguration';
-import { mockUser } from '@/data/mockData';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DoorOpen, Link2, Users, Clock, LayoutGrid } from 'lucide-react';
@@ -18,7 +17,7 @@ const Settings = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <Header user={mockUser} />
+      <Header />
       
       <div className="flex-1 p-6 max-w-5xl mx-auto w-full">
         <div className="mb-6">

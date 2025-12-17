@@ -1,4 +1,3 @@
-import { User } from '@/types/booking';
 import { 
   Bell, 
   ChevronDown, 
@@ -9,7 +8,8 @@ import {
   LayoutGrid,
   Link2,
   Users,
-  Clock
+  Clock,
+  LogOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,19 +22,25 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import { Link, useNavigate } from 'react-router-dom';
-
-interface HeaderProps {
-  user: User;
-}
+import { useAuth } from '@/hooks/useAuth';
 
 const roleLabels: Record<string, string> = {
   admin: 'Administrator',
-  dock_operator: 'Dock Operator',
+  operator: 'Dock Operator',
   viewer: 'Viewer',
 };
 
-export function Header({ user }: HeaderProps) {
+export function Header() {
   const navigate = useNavigate();
+  const { user, profile, roles, signOut, isAdmin } = useAuth();
+
+  const primaryRole = roles[0]?.role || 'viewer';
+  const displayName = profile?.full_name || user?.email || 'User';
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
 
   return (
     <header className="bg-header text-header-foreground">
@@ -58,23 +64,19 @@ export function Header({ user }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-4">
-          <span className="text-sm">{user.name}</span>
-          <Button variant="ghost" size="sm" className="text-header-foreground hover:bg-header-foreground/10">
+          <span className="text-sm">{displayName}</span>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-header-foreground hover:bg-header-foreground/10 gap-2"
+            onClick={handleSignOut}
+          >
+            <LogOut className="w-4 h-4" />
             Log Out
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="text-header-foreground hover:bg-header-foreground/10">
-                {roleLabels[user.role]}
-                <ChevronDown className="w-4 h-4 ml-1" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>Administrator</DropdownMenuItem>
-              <DropdownMenuItem>Dock Operator</DropdownMenuItem>
-              <DropdownMenuItem>Viewer</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <span className="text-xs px-2 py-1 bg-header-foreground/10 rounded">
+            {roleLabels[primaryRole]}
+          </span>
           <Button variant="ghost" size="icon" className="text-header-foreground hover:bg-header-foreground/10 relative">
             <Bell className="w-5 h-5" />
             <span className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center">
@@ -119,16 +121,20 @@ export function Header({ user }: HeaderProps) {
               <Link2 className="w-4 h-4" />
               CartonCloud Integration
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Administration</DropdownMenuLabel>
-            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=users')}>
-              <Users className="w-4 h-4" />
-              User & Role Management
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=defaults')}>
-              <Clock className="w-4 h-4" />
-              Booking Defaults
-            </DropdownMenuItem>
+            {isAdmin && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Administration</DropdownMenuLabel>
+                <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=users')}>
+                  <Users className="w-4 h-4" />
+                  User & Role Management
+                </DropdownMenuItem>
+                <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=defaults')}>
+                  <Clock className="w-4 h-4" />
+                  Booking Defaults
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </nav>
