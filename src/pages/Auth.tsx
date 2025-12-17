@@ -163,20 +163,19 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-header p-4">
-      {/* Logo and Branding */}
-      <div className="mb-8 text-center">
-        <img 
-          src={cartonCloudLogo} 
-          alt="CartonCloud" 
-          className="h-12 mx-auto mb-4"
-        />
-        <h1 className="text-4xl font-bold text-white mb-1">Docks</h1>
-        <p className="text-header-foreground/70 text-sm">By CartonCloud</p>
-      </div>
-
       {/* Login Card */}
       <Card className="w-full max-w-md border-0 shadow-2xl">
-        <CardContent className="pt-6">
+        <CardContent className="pt-8 pb-6">
+          {/* Logo and Branding inside card */}
+          <div className="mb-6 text-center">
+            <img 
+              src={cartonCloudLogo} 
+              alt="CartonCloud" 
+              className="h-10 mx-auto mb-3"
+            />
+            <h1 className="text-2xl font-bold text-foreground mb-1">Dock Management</h1>
+            <p className="text-muted-foreground text-sm">By CartonCloud</p>
+          </div>
           {inviteInfo && (
             <div className="mb-4 p-3 bg-accent/10 rounded-lg text-center">
               <p className="text-sm text-foreground">
