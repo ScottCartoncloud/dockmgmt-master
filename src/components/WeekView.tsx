@@ -4,6 +4,7 @@ import { DraggableBookingCard } from './DraggableBookingCard';
 import { format, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useState, useRef, DragEvent } from 'react';
+import { useDockDoors, DockDoor } from '@/hooks/useDockDoors';
 
 const HOUR_HEIGHT = 80; // pixels per hour
 const START_HOUR = HOURS[0]?.hour || 6; // Calendar starts at this hour
@@ -32,13 +33,25 @@ export function WeekView({
   onBookingMove,
   onBookingResize
 }: WeekViewProps) {
+  const { data: dockDoors } = useDockDoors();
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
   const [draggingBooking, setDraggingBooking] = useState<CrossDockBooking | null>(null);
   const gridRefs = useRef<(HTMLDivElement | null)[]>([]);
   const offsetMinutesRef = useRef<number>(0);
   
+  const activeDocks = dockDoors?.filter(d => d.is_active) || [];
   const weekStart = startOfWeek(date, { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  // Get dock color for a booking based on its dock number
+  const getDockColorForBooking = (booking: CrossDockBooking): string | undefined => {
+    if (!booking.dockNumber) return undefined;
+    const dock = activeDocks.find(d => 
+      d.name.includes(booking.dockNumber!.toString()) || 
+      parseInt(d.name.replace(/\D/g, ''), 10) === booking.dockNumber
+    );
+    return dock?.color;
+  };
 
   const getBookingsForDay = (day: Date) => {
     return bookings.filter((b) => isSameDay(b.date, day));
@@ -274,6 +287,7 @@ export function WeekView({
                           onResize={onBookingResize}
                           compact
                           isDragging={isDragging}
+                          dockColor={getDockColorForBooking(booking)}
                         />
                       </div>
                     );

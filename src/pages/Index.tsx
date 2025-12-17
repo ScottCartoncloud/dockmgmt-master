@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CalendarView, CrossDockBooking } from '@/types/booking';
 import { mockUser, mockBookings } from '@/data/mockData';
 import { Header } from '@/components/Header';
@@ -11,14 +11,24 @@ import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { useDockDoors } from '@/hooks/useDockDoors';
 
+const STORAGE_KEY_VIEW = 'crossdock-calendar-view';
+
 const Index = () => {
   const { data: dockDoors } = useDockDoors();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<CalendarView>('day');
+  const [view, setView] = useState<CalendarView>(() => {
+    const savedView = localStorage.getItem(STORAGE_KEY_VIEW);
+    return (savedView === 'week' || savedView === 'day') ? savedView : 'day';
+  });
   const [bookings, setBookings] = useState<CrossDockBooking[]>(mockBookings);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<CrossDockBooking | null>(null);
   const [defaultSlot, setDefaultSlot] = useState<{ date: Date; hour: number; dockNumber?: number } | null>(null);
+
+  // Persist view preference
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_VIEW, view);
+  }, [view]);
 
   const handleAddBooking = () => {
     setSelectedBooking(null);
