@@ -10,7 +10,7 @@ interface UserProfile {
 }
 
 interface UserRole {
-  role: 'admin' | 'operator' | 'viewer';
+  role: 'admin' | 'operator' | 'viewer' | 'super_user';
 }
 
 interface AuthContextType {
@@ -23,8 +23,9 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
-  hasRole: (role: 'admin' | 'operator' | 'viewer') => boolean;
+  hasRole: (role: 'admin' | 'operator' | 'viewer' | 'super_user') => boolean;
   isAdmin: boolean;
+  isSuperUser: boolean;
   hasTenant: boolean;
 }
 
@@ -133,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRoles([]);
   };
 
-  const hasRole = (role: 'admin' | 'operator' | 'viewer') => {
+  const hasRole = (role: 'admin' | 'operator' | 'viewer' | 'super_user') => {
     return roles.some(r => r.role === role);
   };
 
@@ -149,6 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut,
     hasRole,
     isAdmin: hasRole('admin'),
+    isSuperUser: hasRole('super_user'),
     hasTenant: !!profile?.tenant_id,
   };
 

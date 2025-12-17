@@ -274,6 +274,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_super_user: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "operator" | "viewer" | "super_user"
