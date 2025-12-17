@@ -2,7 +2,6 @@ import {
   Bell, 
   ChevronDown, 
   Search, 
-  Truck, 
   Settings,
   DoorOpen,
   LayoutGrid,
@@ -10,7 +9,7 @@ import {
   Users,
   Clock,
   LogOut,
-  Shield
+  Truck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,8 +21,9 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { TenantSwitcher } from '@/components/TenantSwitcher';
 
 const roleLabels: Record<string, string> = {
   admin: 'Administrator',
@@ -34,7 +34,7 @@ const roleLabels: Record<string, string> = {
 
 export function Header() {
   const navigate = useNavigate();
-  const { user, profile, roles, signOut, isAdmin, isSuperUser } = useAuth();
+  const { user, profile, roles, signOut, isAdmin } = useAuth();
 
   const primaryRole = roles[0]?.role || 'viewer';
   const displayName = profile?.full_name || user?.email || 'User';
@@ -49,12 +49,7 @@ export function Header() {
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-header-foreground/10">
         <div className="flex items-center gap-6">
-          <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <div className="w-8 h-8 bg-accent rounded flex items-center justify-center">
-              <Truck className="w-5 h-5 text-accent-foreground" />
-            </div>
-            <span className="font-semibold text-lg">CrossDock</span>
-          </Link>
+          <TenantSwitcher />
           
           <div className="relative w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-header-foreground/60" />
@@ -139,20 +134,6 @@ export function Header() {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-
-        {isSuperUser && (
-          <>
-            <span className="text-header-foreground/30">|</span>
-            <Button 
-              variant="ghost" 
-              className="text-header-foreground hover:bg-header-foreground/10 gap-2"
-              onClick={() => navigate('/admin')}
-            >
-              <Shield className="w-4 h-4" />
-              Admin
-            </Button>
-          </>
-        )}
       </nav>
     </header>
   );
