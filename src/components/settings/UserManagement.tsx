@@ -60,7 +60,7 @@ const roleBadgeVariants: Record<AppRole, 'default' | 'secondary' | 'outline'> = 
 export function UserManagement() {
   const queryClient = useQueryClient();
   const { isAdmin, isSuperUser } = useAuth();
-  const { activeTenant } = useTenantContext();
+  const { activeTenant, isLoading: isTenantLoading } = useTenantContext();
   const canManageUsers = isAdmin || isSuperUser;
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -237,6 +237,15 @@ export function UserManagement() {
       user.email?.toLowerCase().includes(searchLower)
     );
   });
+
+  // Show loading while tenant context is initializing
+  if (isTenantLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   if (!activeTenant) {
     return (
