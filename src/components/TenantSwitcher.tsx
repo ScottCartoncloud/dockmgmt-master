@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown, Search, Truck, Shield, Check } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -15,6 +16,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 export function TenantSwitcher() {
+  const navigate = useNavigate();
   const { tenants, activeTenant, setActiveTenant, isLoading } = useTenantContext();
   const { isSuperUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,6 +30,11 @@ export function TenantSwitcher() {
     setActiveTenant(tenant);
     setSearchQuery('');
     setOpen(false);
+  };
+
+  const handleAdminClick = () => {
+    setOpen(false);
+    navigate('/admin');
   };
 
   return (
@@ -58,11 +65,14 @@ export function TenantSwitcher() {
         className="w-72 bg-header border-header-foreground/20"
         sideOffset={8}
       >
-        {/* Header with Super User badge */}
-        <div className="px-3 py-2 border-b border-header-foreground/20">
+        {/* Header - Administration link */}
+        <div 
+          className="px-3 py-2 border-b border-header-foreground/20 cursor-pointer hover:bg-header-foreground/10 transition-colors"
+          onClick={handleAdminClick}
+        >
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-header-foreground">
-              Switch Tenant
+              Administration
             </span>
             {isSuperUser && (
               <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 bg-header-foreground/10 text-header-foreground rounded-full">
