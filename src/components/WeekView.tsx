@@ -288,10 +288,10 @@ export function WeekView({
                     const style = getBookingStyle(booking);
                     const isDragging = draggingBooking?.id === booking.id;
                     const layout = dayLayouts.get(day.toISOString())?.get(booking.id);
-                    const layoutStyle = layout 
+                    const layoutStyle = layout
                       ? getBookingLayoutStyle(layout.column, layout.totalColumns, 2)
-                      : { left: '2px', width: 'calc(100% - 4px)' };
-                    
+                      : { left: '2px', right: '2px' };
+
                     return (
                       <div
                         key={booking.id}
@@ -303,7 +303,7 @@ export function WeekView({
                           top: style.top,
                           height: style.height,
                           left: layoutStyle.left,
-                          width: layoutStyle.width,
+                          right: layoutStyle.right,
                         }}
                       >
                         <DraggableBookingCard

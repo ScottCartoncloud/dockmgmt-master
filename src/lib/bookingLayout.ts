@@ -103,16 +103,17 @@ export function getBookingLayoutStyle(
   column: number,
   totalColumns: number,
   gap: number = 2
-): { left: string; width: string } {
+): { left: string; right: string } {
   if (totalColumns <= 1) {
-    return { left: `${gap}px`, width: `calc(100% - ${gap * 2}px)` };
+    return { left: `${gap}px`, right: `${gap}px` };
   }
-  
+
   const widthPercent = 100 / totalColumns;
   const leftPercent = column * widthPercent;
-  
+  const rightPercent = (totalColumns - column - 1) * widthPercent;
+
   return {
     left: `calc(${leftPercent}% + ${gap}px)`,
-    width: `calc(${widthPercent}% - ${gap * 2}px)`,
+    right: `calc(${rightPercent}% + ${gap}px)`,
   };
 }
