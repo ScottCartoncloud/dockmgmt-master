@@ -3,6 +3,9 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
 
+// Enable dev bypass for testing in Lovable preview
+const DEV_BYPASS_AUTH = true; // Set to false for production
+
 interface ProtectedRouteProps {
   children: ReactNode;
   requireTenant?: boolean;
@@ -15,6 +18,11 @@ export function ProtectedRoute({
   requiredRole 
 }: ProtectedRouteProps) {
   const { user, isLoading, hasTenant, hasRole } = useAuth();
+
+  // Dev bypass - skip all auth checks in development
+  if (DEV_BYPASS_AUTH) {
+    return <>{children}</>;
+  }
 
   if (isLoading) {
     return (
