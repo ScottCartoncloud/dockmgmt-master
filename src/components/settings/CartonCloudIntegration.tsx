@@ -39,7 +39,7 @@ export function CartonCloudIntegration() {
     if (settings) {
       setClientId(settings.client_id);
       setClientSecret(settings.client_secret);
-      setTenantId(settings.tenant_id);
+      setTenantId(settings.cartoncloud_tenant_id);
       setConnectionStatus('success');
     }
   }, [settings]);
@@ -82,7 +82,7 @@ export function CartonCloudIntegration() {
       await saveSettings.mutateAsync({
         client_id: clientId,
         client_secret: clientSecret,
-        tenant_id: tenantId,
+        cartoncloud_tenant_id: tenantId,
       });
       toast.success('CartonCloud settings saved successfully');
     } catch (error) {
