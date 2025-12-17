@@ -3,9 +3,10 @@ import { HOURS } from '@/data/mockData';
 import { DraggableBookingCard } from './DraggableBookingCard';
 import { format, isSameDay } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useState, useRef, DragEvent } from 'react';
+import { useState, useRef, DragEvent, useMemo } from 'react';
 import { useDockDoors, DockDoor } from '@/hooks/useDockDoors';
 import { Loader2 } from 'lucide-react';
+import { calculateBookingLayout, getBookingLayoutStyle } from '@/lib/bookingLayout';
 
 const HOUR_HEIGHT = 80; // pixels per hour
 const QUARTER_HEIGHT = HOUR_HEIGHT / 4; // 20px per 15 minutes
@@ -183,6 +184,25 @@ export function DayView({
     });
   };
 
+  // Calculate layout for each dock's bookings
+  const dockLayouts = useMemo(() => {
+    const layouts = new Map<string, Map<string, { column: number; totalColumns: number }>>();
+    
+    activeDocks.forEach(dock => {
+      const dockBookings = getBookingsForDock(dock);
+      const positions = calculateBookingLayout(dockBookings);
+      
+      const bookingMap = new Map<string, { column: number; totalColumns: number }>();
+      positions.forEach(pos => {
+        bookingMap.set(pos.booking.id, { column: pos.column, totalColumns: pos.totalColumns });
+      });
+      
+      layouts.set(dock.id, bookingMap);
+    });
+    
+    return layouts;
+  }, [dayBookings, activeDocks]);
+
   // Bookings without an assigned dock
   const unassignedBookings = dayBookings.filter(booking => !booking.dockNumber);
 
@@ -311,17 +331,23 @@ export function DayView({
                     {dockBookings.map((booking) => {
                       const style = getBookingStyle(booking);
                       const isDragging = draggingBooking?.id === booking.id;
+                      const layout = dockLayouts.get(dock.id)?.get(booking.id);
+                      const layoutStyle = layout 
+                        ? getBookingLayoutStyle(layout.column, layout.totalColumns, 4)
+                        : { left: '4px', width: 'calc(100% - 8px)' };
                       
                       return (
                         <div
                           key={booking.id}
                           className={cn(
-                            "absolute left-1 right-1 pointer-events-auto z-10",
+                            "absolute pointer-events-auto z-10",
                             isDragging && "opacity-30"
                           )}
                           style={{
                             top: style.top,
                             height: style.height,
+                            left: layoutStyle.left,
+                            width: layoutStyle.width,
                           }}
                         >
                           <DraggableBookingCard
