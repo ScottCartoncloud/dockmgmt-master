@@ -1,10 +1,8 @@
 import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Loader2 } from 'lucide-react';
-
-// Enable dev bypass for testing in Lovable preview
-const DEV_BYPASS_AUTH = true; // Set to false for production
+import { Loader2, ShieldX } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -18,11 +16,6 @@ export function ProtectedRoute({
   requiredRole 
 }: ProtectedRouteProps) {
   const { user, isLoading, hasTenant, hasRole } = useAuth();
-
-  // Dev bypass - skip all auth checks in development
-  if (DEV_BYPASS_AUTH) {
-    return <>{children}</>;
-  }
 
   if (isLoading) {
     return (
@@ -49,14 +42,23 @@ export function ProtectedRoute({
     );
   }
 
+  // Role-based access control - returns 403 Forbidden equivalent
   if (requiredRole && !hasRole(requiredRole)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center p-8 max-w-md">
-          <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
-          <p className="text-muted-foreground">
-            You don't have the required permissions to access this page.
+          <div className="flex justify-center mb-4">
+            <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center">
+              <ShieldX className="w-8 h-8 text-destructive" />
+            </div>
+          </div>
+          <h2 className="text-xl font-semibold text-foreground mb-2">403 - Access Forbidden</h2>
+          <p className="text-muted-foreground mb-6">
+            You don't have permission to access this resource. This area is restricted to authorized users only.
           </p>
+          <Button variant="outline" onClick={() => window.history.back()}>
+            Go Back
+          </Button>
         </div>
       </div>
     );
