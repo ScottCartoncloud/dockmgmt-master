@@ -1,6 +1,16 @@
+/**
+ * send-invite-email Edge Function
+ * 
+ * SECURITY: Redirect URLs are server-controlled via APP_BASE_URL environment variable.
+ * This prevents open redirect attacks where malicious actors could craft invite emails
+ * pointing to phishing sites. Zod schemas are mandatory for all edge function input validation.
+ */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const APP_BASE_URL = Deno.env.get("APP_BASE_URL");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,13 +18,27 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-interface InviteEmailRequest {
-  email: string;
-  inviteToken: string;
-  tenantName: string;
-  role: string;
-  invitedByName?: string;
-  appUrl: string;
+// Zod schema for strict input validation - rejects unknown fields
+const inviteEmailSchema = z.object({
+  email: z.string().email("Invalid email format").max(255, "Email too long"),
+  inviteToken: z.string().uuid("Invalid invite token format"),
+  tenantId: z.string().uuid("Invalid tenant ID format"),
+  role: z.enum(["admin", "operator", "viewer", "Admin", "Operator", "Viewer"], {
+    errorMap: () => ({ message: "Invalid role" }),
+  }),
+  invitedByName: z.string().max(200, "Name too long").optional(),
+}).strict(); // Reject any additional fields
+
+// HTML escape function to prevent XSS in email templates
+function escapeHtml(str: string): string {
+  const map: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  };
+  return str.replace(/[&<>"']/g, m => map[m]);
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -24,11 +48,119 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, inviteToken, tenantName, role, invitedByName, appUrl }: InviteEmailRequest = await req.json();
+    // Validate APP_BASE_URL is configured
+    if (!APP_BASE_URL) {
+      console.error("APP_BASE_URL environment variable not configured");
+      return new Response(
+        JSON.stringify({ error: "Server configuration error" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    console.log(`Sending invite email to ${email} for tenant ${tenantName}`);
+    // Require authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error('No authorization header provided');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    const signupUrl = `${appUrl}/auth?invite=${inviteToken}`;
+    // Create Supabase client with user's auth context
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    // Verify JWT and get user
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log('Authenticated user:', user.id);
+
+    // Parse and validate request body with Zod
+    const rawBody = await req.json();
+    const parseResult = inviteEmailSchema.safeParse(rawBody);
+    
+    if (!parseResult.success) {
+      console.error('Validation error:', parseResult.error.errors);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid request data',
+          details: parseResult.error.errors.map(e => e.message)
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { email, inviteToken, tenantId, role, invitedByName } = parseResult.data;
+
+    // Get user's profile and roles for authorization
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single();
+
+    const { data: roles } = await supabaseClient
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+
+    const userRoles = roles?.map((r: { role: string }) => r.role) || [];
+    const isAuthorized = userRoles.includes('admin') || userRoles.includes('super_user');
+
+    if (!isAuthorized) {
+      console.log('User not authorized - roles:', userRoles);
+      return new Response(
+        JSON.stringify({ error: 'Insufficient permissions. Admin or Super User role required.' }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Verify user can invite for this tenant (super_user can invite anywhere)
+    if (!userRoles.includes('super_user') && profile?.tenant_id !== tenantId) {
+      console.log('Tenant mismatch - user tenant:', profile?.tenant_id, 'requested tenant:', tenantId);
+      return new Response(
+        JSON.stringify({ error: 'Cannot send invites for other tenants' }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Fetch tenant name from database
+    const { data: tenant, error: tenantError } = await supabaseClient
+      .from('tenants')
+      .select('name')
+      .eq('id', tenantId)
+      .single();
+
+    if (tenantError || !tenant) {
+      console.error('Tenant not found:', tenantId);
+      return new Response(
+        JSON.stringify({ error: 'Tenant not found' }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Sending invite email to ${email} for tenant ${tenant.name}`);
+
+    // Construct signup URL server-side using trusted APP_BASE_URL
+    const signupUrl = `${APP_BASE_URL}/auth?invite=${inviteToken}`;
+
+    // Sanitize all user-provided values for HTML template
+    const safeTenantName = escapeHtml(tenant.name);
+    const safeRole = escapeHtml(role);
+    const safeInvitedByName = invitedByName ? escapeHtml(invitedByName) : null;
+    const safeEmail = escapeHtml(email);
 
     const emailHtml = `
       <!DOCTYPE html>
@@ -56,7 +188,7 @@ const handler = async (req: Request): Promise<Response> => {
                     
                     <p style="margin: 16px 0;">Hello,</p>
                     
-                    <p style="margin: 16px 0;">${invitedByName ? `<strong>${invitedByName}</strong> has invited you` : "You've been invited"} to join <strong>${tenantName}</strong> on Dock Management as a <strong>${role}</strong>.</p>
+                    <p style="margin: 16px 0;">${safeInvitedByName ? `<strong>${safeInvitedByName}</strong> has invited you` : "You've been invited"} to join <strong>${safeTenantName}</strong> on Dock Management as a <strong>${safeRole}</strong>.</p>
                     
                     <p style="margin: 16px 0;">Dock Management helps warehouse teams manage cross-docking operations with an intuitive calendar-based scheduling system.</p>
                     
@@ -97,7 +229,7 @@ const handler = async (req: Request): Promise<Response> => {
       body: JSON.stringify({
         from: "Dock Management <noreply@dockmgmt.cartoncloud.com>",
         to: [email],
-        subject: `You've been invited to join ${tenantName} on Dock Management`,
+        subject: `You've been invited to join ${safeTenantName} on Dock Management`,
         html: emailHtml,
       }),
     });

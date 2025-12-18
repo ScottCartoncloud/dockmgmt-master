@@ -133,21 +133,20 @@ export function UserManagement() {
       if (error) throw error;
 
       // Send invite email via edge function
+      // Note: appUrl is NOT sent - the server uses APP_BASE_URL env var to prevent open redirects
       console.log('Calling send-invite-email edge function with:', {
         email,
         inviteToken: invite.id,
-        tenantName: activeTenant.name,
+        tenantId: activeTenant.id,
         role: roleLabels[role],
-        appUrl: window.location.origin,
       });
 
       const { data: emailData, error: emailError } = await supabase.functions.invoke('send-invite-email', {
         body: {
           email,
           inviteToken: invite.id,
-          tenantName: activeTenant.name,
+          tenantId: activeTenant.id,
           role: roleLabels[role],
-          appUrl: window.location.origin,
         },
       });
 
