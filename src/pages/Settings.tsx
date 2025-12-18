@@ -20,8 +20,6 @@ const Settings = () => {
     setSearchParams({ tab: value });
   };
 
-  // Calculate grid columns based on available tabs
-  const tabCount = canAccessIntegration ? 5 : 4;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -34,7 +32,7 @@ const Settings = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className={`grid w-full grid-cols-${tabCount} lg:w-auto lg:inline-grid`}>
+          <TabsList className={`grid w-full lg:w-auto lg:inline-grid ${canAccessIntegration ? 'grid-cols-5' : 'grid-cols-4'}`}>
             <TabsTrigger value="docks" className="gap-2">
               <DoorOpen className="w-4 h-4" />
               <span className="hidden sm:inline">Docks</span>
