@@ -28,7 +28,7 @@ const EmailPreview = () => {
               <!-- Header -->
               <tr>
                 <td style="background-color: ${brandBlue}; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
-                  <img src="https://www.cartoncloud.com/wp-content/uploads/2021/03/cartoncloud-logo-white.png" alt="CartonCloud" style="height: 40px; margin-bottom: 12px;" />
+                  <img src="/images/cartoncloud-logo-white.png" alt="CartonCloud" style="height: 40px; margin-bottom: 12px;" />
                   <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">Dock Management</h1>
                 </td>
               </tr>

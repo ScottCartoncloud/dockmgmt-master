@@ -157,8 +157,8 @@ const handler = async (req: Request): Promise<Response> => {
     // Construct signup URL server-side using trusted APP_BASE_URL (trimmed)
     const signupUrl = `${baseUrl}/auth?invite=${inviteToken}`;
     
-    // CartonCloud logo - use PNG for email client compatibility (SVG often not supported)
-    const logoUrl = 'https://www.cartoncloud.com/wp-content/uploads/2021/03/cartoncloud-logo-white.png';
+    // CartonCloud logo - hosted from our own public folder for reliable email rendering
+    const logoUrl = `${baseUrl}/images/cartoncloud-logo-white.png`;
     
     // CartonCloud brand blue matching the app header: HSL(206, 95%, 36%)
     const brandBlue = '#0580c7';
