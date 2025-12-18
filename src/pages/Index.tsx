@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { CalendarView, CrossDockBooking } from '@/types/booking';
-import { mockBookings } from '@/data/mockData';
 import { Header } from '@/components/Header';
 import { CalendarHeader } from '@/components/CalendarHeader';
 import { DayView } from '@/components/DayView';
@@ -11,21 +10,26 @@ import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { useDockDoors } from '@/hooks/useDockDoors';
 import { useAuth } from '@/hooks/useAuth';
+import { useBookings, useCreateBooking, useUpdateBooking, useDeleteBooking } from '@/hooks/useBookings';
 
 const STORAGE_KEY_VIEW = 'crossdock-calendar-view';
 
 const Index = () => {
   const { user } = useAuth();
   const { data: dockDoors } = useDockDoors();
+  const { bookings, isLoading } = useBookings();
+  const createBooking = useCreateBooking();
+  const updateBooking = useUpdateBooking();
+  const deleteBooking = useDeleteBooking();
+  
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<CalendarView>(() => {
     const savedView = localStorage.getItem(STORAGE_KEY_VIEW);
     return (savedView === 'week' || savedView === 'day') ? savedView : 'day';
   });
-  const [bookings, setBookings] = useState<CrossDockBooking[]>(mockBookings);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<CrossDockBooking | null>(null);
-  const [defaultSlot, setDefaultSlot] = useState<{ date: Date; hour: number; dockNumber?: number } | null>(null);
+  const [defaultSlot, setDefaultSlot] = useState<{ date: Date; hour: number; dockNumber?: number; dockId?: string } | null>(null);
 
   // Persist view preference
   useEffect(() => {
@@ -50,7 +54,7 @@ const Index = () => {
       }
     }
     
-    setDefaultSlot({ date, hour, dockNumber });
+    setDefaultSlot({ date, hour, dockNumber, dockId });
     setModalOpen(true);
   };
 
@@ -60,61 +64,66 @@ const Index = () => {
     setModalOpen(true);
   };
 
-  const handleSaveBooking = (bookingData: Partial<CrossDockBooking>) => {
-    if (bookingData.id) {
-      // Edit existing booking
-      setBookings((prev) =>
-        prev.map((b) =>
-          b.id === bookingData.id ? { ...b, ...bookingData } as CrossDockBooking : b
-        )
-      );
+  const handleSaveBooking = async (bookingData: Partial<CrossDockBooking> & { dockDoorId?: string }) => {
+    try {
+      if (bookingData.id) {
+        // Edit existing booking
+        await updateBooking.mutateAsync({ 
+          id: bookingData.id, 
+          ...bookingData 
+        });
+        toast({
+          title: 'Booking Updated',
+          description: `${bookingData.title} has been updated successfully.`,
+        });
+      } else {
+        // Create new booking
+        await createBooking.mutateAsync({
+          ...bookingData,
+          dockDoorId: bookingData.dockDoorId || defaultSlot?.dockId,
+        });
+        toast({
+          title: 'Booking Created',
+          description: `${bookingData.title || 'New Booking'} has been scheduled.`,
+        });
+      }
+      setModalOpen(false);
+    } catch (error) {
+      console.error('Error saving booking:', error);
       toast({
-        title: 'Booking Updated',
-        description: `${bookingData.title} has been updated successfully.`,
-      });
-    } else {
-      // Create new booking
-      const newBooking: CrossDockBooking = {
-        id: Date.now().toString(),
-        title: bookingData.title || 'New Booking',
-        date: bookingData.date || new Date(),
-        startTime: bookingData.startTime || '09:00',
-        endTime: bookingData.endTime || '10:00',
-        carrier: bookingData.carrier || '',
-        truckRego: bookingData.truckRego,
-        dockNumber: bookingData.dockNumber,
-        purchaseOrderId: bookingData.purchaseOrderId,
-        purchaseOrder: bookingData.purchaseOrder,
-        notes: bookingData.notes,
-        status: bookingData.status || 'scheduled',
-        createdBy: user?.id || 'unknown',
-        createdAt: new Date(),
-      };
-      setBookings((prev) => [...prev, newBooking]);
-      toast({
-        title: 'Booking Created',
-        description: `${newBooking.title} has been scheduled.`,
+        title: 'Error',
+        description: 'Failed to save booking. Please try again.',
+        variant: 'destructive',
       });
     }
   };
 
-  const handleDeleteBooking = (id: string) => {
-    setBookings((prev) => prev.filter((b) => b.id !== id));
-    toast({
-      title: 'Booking Deleted',
-      description: 'The booking has been removed.',
-      variant: 'destructive',
-    });
+  const handleDeleteBooking = async (id: string) => {
+    try {
+      await deleteBooking.mutateAsync(id);
+      toast({
+        title: 'Booking Deleted',
+        description: 'The booking has been removed.',
+        variant: 'destructive',
+      });
+      setModalOpen(false);
+    } catch (error) {
+      console.error('Error deleting booking:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete booking. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleBookingMove = (booking: CrossDockBooking, newDate: Date, dropHour: number, offsetMinutes: number, newDockId?: string) => {
+  const handleBookingMove = async (booking: CrossDockBooking, newDate: Date, dropHour: number, offsetMinutes: number, newDockId?: string) => {
     // Calculate the duration of the booking in minutes
     const [startH, startM] = booking.startTime.split(':').map(Number);
     const [endH, endM] = booking.endTime.split(':').map(Number);
     const durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
     
     // Calculate the new start time by subtracting the click offset from the drop position
-    // dropHour is where the mouse was released, offsetMinutes is how far into the booking they clicked
     const dropMinutes = dropHour * 60;
     const newStartMinutes = Math.max(0, dropMinutes - offsetMinutes);
     
@@ -141,32 +150,50 @@ const Index = () => {
       }
     }
     
-    setBookings((prev) =>
-      prev.map((b) =>
-        b.id === booking.id
-          ? { ...b, date: newDate, startTime: newStartTime, endTime: newEndTime, dockNumber: newDockNumber }
-          : b
-      )
-    );
-    
-    const dockInfo = newDockNumber ? ` on Dock ${newDockNumber}` : '';
-    toast({
-      title: 'Booking Moved',
-      description: `${booking.title} moved to ${format(newDate, 'EEE, MMM d')} at ${newStartTime}${dockInfo}`,
-    });
+    try {
+      await updateBooking.mutateAsync({
+        id: booking.id,
+        date: newDate,
+        startTime: newStartTime,
+        endTime: newEndTime,
+        dockNumber: newDockNumber,
+        dockDoorId: newDockId,
+      });
+      
+      const dockInfo = newDockNumber ? ` on Dock ${newDockNumber}` : '';
+      toast({
+        title: 'Booking Moved',
+        description: `${booking.title} moved to ${format(newDate, 'EEE, MMM d')} at ${newStartTime}${dockInfo}`,
+      });
+    } catch (error) {
+      console.error('Error moving booking:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to move booking. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleBookingResize = (booking: CrossDockBooking, newEndTime: string) => {
-    setBookings((prev) =>
-      prev.map((b) =>
-        b.id === booking.id ? { ...b, endTime: newEndTime } : b
-      )
-    );
-    
-    toast({
-      title: 'Booking Duration Changed',
-      description: `${booking.title} now ends at ${newEndTime}`,
-    });
+  const handleBookingResize = async (booking: CrossDockBooking, newEndTime: string) => {
+    try {
+      await updateBooking.mutateAsync({
+        id: booking.id,
+        endTime: newEndTime,
+      });
+      
+      toast({
+        title: 'Booking Duration Changed',
+        description: `${booking.title} now ends at ${newEndTime}`,
+      });
+    } catch (error) {
+      console.error('Error resizing booking:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update booking duration. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (

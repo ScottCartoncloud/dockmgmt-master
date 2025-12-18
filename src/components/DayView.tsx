@@ -1,5 +1,5 @@
 import { CrossDockBooking } from '@/types/booking';
-import { HOURS } from '@/data/mockData';
+import { HOURS } from '@/lib/calendarConstants';
 import { DraggableBookingCard } from './DraggableBookingCard';
 import { format, isSameDay } from 'date-fns';
 import { cn } from '@/lib/utils';

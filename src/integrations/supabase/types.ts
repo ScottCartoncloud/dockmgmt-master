@@ -14,6 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
+      bookings: {
+        Row: {
+          carrier: string | null
+          cartoncloud_po: Json | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json | null
+          date: string
+          dock_door_id: string | null
+          end_time: string
+          id: string
+          notes: string | null
+          purchase_order: Json | null
+          purchase_order_id: string | null
+          start_time: string
+          status: string
+          tenant_id: string | null
+          title: string
+          truck_rego: string | null
+          updated_at: string
+        }
+        Insert: {
+          carrier?: string | null
+          cartoncloud_po?: Json | null
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json | null
+          date: string
+          dock_door_id?: string | null
+          end_time: string
+          id?: string
+          notes?: string | null
+          purchase_order?: Json | null
+          purchase_order_id?: string | null
+          start_time: string
+          status?: string
+          tenant_id?: string | null
+          title: string
+          truck_rego?: string | null
+          updated_at?: string
+        }
+        Update: {
+          carrier?: string | null
+          cartoncloud_po?: Json | null
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json | null
+          date?: string
+          dock_door_id?: string | null
+          end_time?: string
+          id?: string
+          notes?: string | null
+          purchase_order?: Json | null
+          purchase_order_id?: string | null
+          start_time?: string
+          status?: string
+          tenant_id?: string | null
+          title?: string
+          truck_rego?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_dock_door_id_fkey"
+            columns: ["dock_door_id"]
+            isOneToOne: false
+            referencedRelation: "dock_doors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cartoncloud_settings: {
         Row: {
           cartoncloud_tenant_id: string
