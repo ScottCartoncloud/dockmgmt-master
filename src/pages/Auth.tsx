@@ -28,10 +28,6 @@ const signupSchema = z.object({
   path: ['confirmPassword'],
 });
 
-// Dev mode config - only works in Lovable preview
-const DEV_EMAIL = 'scott.murray@cartoncloud.com';
-const isDevMode = window.location.hostname.includes('lovableproject.com');
-
 export default function Auth() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -42,8 +38,8 @@ export default function Auth() {
   const [error, setError] = useState<string | null>(null);
   const [inviteInfo, setInviteInfo] = useState<{ email: string; tenantName: string } | null>(null);
   
-  // Form state - auto-fill email in dev mode
-  const [loginEmail, setLoginEmail] = useState(isDevMode ? DEV_EMAIL : '');
+  // Form state
+  const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [signupName, setSignupName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
@@ -180,14 +176,6 @@ export default function Auth() {
             <h1 className="text-2xl font-bold text-foreground mb-1">Dock Management</h1>
             <p className="text-muted-foreground text-sm">By CartonCloud</p>
           </div>
-          
-          {isDevMode && (
-            <div className="mb-4 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-center">
-              <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                🛠️ Dev Mode: Email pre-filled
-              </p>
-            </div>
-          )}
           
           {inviteInfo && (
             <div className="mb-4 p-3 bg-accent/10 rounded-lg text-center">
