@@ -166,7 +166,6 @@ export default function Auth() {
     }
 
     // Complete invite acceptance (attach tenant + role) after signup
-    const inviteToken = searchParams.get('invite');
     const { error: acceptError } = await supabase.functions.invoke('accept-invite', {
       body: { inviteToken },
     });
