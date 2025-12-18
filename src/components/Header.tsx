@@ -1,5 +1,4 @@
 import { 
-  Bell, 
   ChevronDown, 
   Search, 
   Settings,
@@ -74,12 +73,6 @@ export function Header() {
           <span className="text-xs px-2 py-1 bg-header-foreground/10 rounded">
             {roleLabels[primaryRole]}
           </span>
-          <Button variant="ghost" size="icon" className="text-header-foreground hover:bg-header-foreground/10 relative">
-            <Bell className="w-5 h-5" />
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center">
-              3
-            </span>
-          </Button>
         </div>
       </div>
 
