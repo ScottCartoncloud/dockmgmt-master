@@ -48,8 +48,8 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    // Validate APP_BASE_URL is configured and trim any whitespace
-    const baseUrl = APP_BASE_URL?.trim();
+    // Validate APP_BASE_URL is configured, trim whitespace and trailing slashes
+    const baseUrl = APP_BASE_URL?.trim().replace(/\/+$/, '');
     if (!baseUrl) {
       console.error("APP_BASE_URL environment variable not configured");
       return new Response(
