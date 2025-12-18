@@ -48,8 +48,9 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    // Validate APP_BASE_URL is configured
-    if (!APP_BASE_URL) {
+    // Validate APP_BASE_URL is configured and trim any whitespace
+    const baseUrl = APP_BASE_URL?.trim();
+    if (!baseUrl) {
       console.error("APP_BASE_URL environment variable not configured");
       return new Response(
         JSON.stringify({ error: "Server configuration error" }),
@@ -153,11 +154,11 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Sending invite email to ${email} for tenant ${tenant.name}`);
 
-    // Construct signup URL server-side using trusted APP_BASE_URL
-    const signupUrl = `${APP_BASE_URL}/auth?invite=${inviteToken}`;
+    // Construct signup URL server-side using trusted APP_BASE_URL (trimmed)
+    const signupUrl = `${baseUrl}/auth?invite=${inviteToken}`;
     
-    // CartonCloud logo - hosted publicly
-    const logoUrl = 'https://www.cartoncloud.com/wp-content/uploads/2023/03/logo-white.svg';
+    // CartonCloud logo - use PNG for email client compatibility (SVG often not supported)
+    const logoUrl = 'https://www.cartoncloud.com/wp-content/uploads/2021/03/cartoncloud-logo-white.png';
     
     // CartonCloud brand blue matching the app header: HSL(206, 95%, 36%)
     const brandBlue = '#0580c7';
