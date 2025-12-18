@@ -28,7 +28,7 @@ const Settings = () => {
       <div className="flex-1 p-6 max-w-5xl mx-auto w-full">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-          <p className="text-muted-foreground">Manage your Dock Management platform configuration.</p>
+          <p className="text-muted-foreground">Manage your platforms configurations.</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
