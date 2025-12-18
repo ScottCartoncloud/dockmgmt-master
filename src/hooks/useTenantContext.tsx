@@ -18,8 +18,8 @@ const TenantContext = createContext<TenantContextType | undefined>(undefined);
 
 const ACTIVE_TENANT_KEY = 'crossdock_active_tenant';
 
-// Dev mode bypass - allows tenant selection without auth
-const DEV_BYPASS_AUTH = true;
+// Dev mode bypass - disabled since RLS requires authenticated user
+const DEV_BYPASS_AUTH = false;
 
 export function TenantProvider({ children }: { children: React.ReactNode }) {
   const { user, isSuperUser, profile } = useAuth();

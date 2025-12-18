@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenantContext } from '@/hooks/useTenantContext';
 
 export interface CartonCloudSettings {
   id: string;
@@ -13,29 +14,43 @@ export interface CartonCloudSettings {
 }
 
 export function useCartonCloudSettings() {
+  const { activeTenant } = useTenantContext();
+  
   return useQuery({
-    queryKey: ['cartoncloud-settings'],
+    queryKey: ['cartoncloud-settings', activeTenant?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('cartoncloud_settings')
-        .select('*')
-        .maybeSingle();
+        .select('*');
+      
+      if (activeTenant?.id) {
+        query = query.eq('tenant_id', activeTenant.id);
+      }
+      
+      const { data, error } = await query.maybeSingle();
       
       if (error) throw error;
       return data as CartonCloudSettings | null;
     },
+    enabled: !!activeTenant?.id,
   });
 }
 
 export function useSaveCartonCloudSettings() {
   const queryClient = useQueryClient();
+  const { activeTenant } = useTenantContext();
 
   return useMutation({
     mutationFn: async (settings: { client_id: string; client_secret: string; cartoncloud_tenant_id: string }) => {
-      // First check if settings exist
+      if (!activeTenant?.id) {
+        throw new Error('No active tenant selected');
+      }
+
+      // First check if settings exist for this tenant
       const { data: existing } = await supabase
         .from('cartoncloud_settings')
         .select('id')
+        .eq('tenant_id', activeTenant.id)
         .maybeSingle();
 
       if (existing) {
@@ -55,13 +70,14 @@ export function useSaveCartonCloudSettings() {
         if (error) throw error;
         return data;
       } else {
-        // Insert new
+        // Insert new with tenant_id
         const { data, error } = await supabase
           .from('cartoncloud_settings')
           .insert({
             client_id: settings.client_id,
             client_secret: settings.client_secret,
             cartoncloud_tenant_id: settings.cartoncloud_tenant_id,
+            tenant_id: activeTenant.id,
             is_active: true,
           })
           .select()
