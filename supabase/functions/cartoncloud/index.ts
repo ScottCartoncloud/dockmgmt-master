@@ -12,13 +12,14 @@ const CARTONCLOUD_API_BASE = 'https://api.cartoncloud.com';
 interface TokenCache {
   accessToken: string;
   expiresAt: number;
+  tenantId: string;
 }
 
 let tokenCache: TokenCache | null = null;
 
-async function getAccessToken(clientId: string, clientSecret: string): Promise<string> {
-  // Check if we have a valid cached token
-  if (tokenCache && Date.now() < tokenCache.expiresAt - 60000) { // 1 minute buffer
+async function getAccessToken(clientId: string, clientSecret: string, tenantId: string): Promise<string> {
+  // Check if we have a valid cached token for the same tenant
+  if (tokenCache && tokenCache.tenantId === tenantId && Date.now() < tokenCache.expiresAt - 60000) {
     console.log('Using cached access token');
     return tokenCache.accessToken;
   }
@@ -48,6 +49,7 @@ async function getAccessToken(clientId: string, clientSecret: string): Promise<s
   tokenCache = {
     accessToken: data.access_token,
     expiresAt: Date.now() + (data.expires_in * 1000),
+    tenantId,
   };
 
   return data.access_token;
@@ -110,7 +112,7 @@ async function testConnection(
   tenantId: string
 ): Promise<{ success: boolean; message: string; userInfo?: any }> {
   try {
-    const accessToken = await getAccessToken(clientId, clientSecret);
+    const accessToken = await getAccessToken(clientId, clientSecret, tenantId);
     
     // Test by getting user info
     const response = await fetch(`${CARTONCLOUD_API_BASE}/uaa/userinfo`, {
@@ -141,6 +143,34 @@ async function testConnection(
   }
 }
 
+// Helper to validate user authorization
+async function validateUserAuthorization(
+  supabaseClient: any, 
+  userId: string, 
+  userTenantId: string | null
+): Promise<{ authorized: boolean; error?: string }> {
+  // Check if user has admin or super_user role
+  const { data: roles, error: rolesError } = await supabaseClient
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId);
+
+  if (rolesError) {
+    console.error('Error fetching user roles:', rolesError);
+    return { authorized: false, error: 'Failed to verify user permissions' };
+  }
+
+  const userRoles = roles?.map((r: { role: string }) => r.role) || [];
+  const isAuthorized = userRoles.includes('admin') || userRoles.includes('super_user');
+
+  if (!isAuthorized) {
+    console.log('User not authorized - roles:', userRoles);
+    return { authorized: false, error: 'Insufficient permissions. Admin or Super User role required.' };
+  }
+
+  return { authorized: true };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -148,19 +178,94 @@ serve(async (req) => {
   }
 
   try {
+    // Extract and validate JWT from request
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error('No authorization header provided');
+      return new Response(
+        JSON.stringify({ error: 'Authorization required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create client with user's auth context to leverage RLS
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
     );
+
+    // Verify the user's JWT and get user info
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Authenticated user:', user.id);
+
+    // Get user's tenant_id from profile
+    const { data: profile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError) {
+      console.error('Error fetching profile:', profileError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch user profile' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userTenantId = profile?.tenant_id;
+    console.log('User tenant_id:', userTenantId);
+
+    // Validate user has admin or super_user role
+    const { authorized, error: authzError } = await validateUserAuthorization(
+      supabaseClient, 
+      user.id, 
+      userTenantId
+    );
+
+    if (!authorized) {
+      return new Response(
+        JSON.stringify({ error: authzError }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const { action, searchTerm, clientId, clientSecret, tenantId } = await req.json();
     console.log('CartonCloud function called with action:', action);
 
-    // For test-connection, use provided credentials
+    // Input validation
+    if (action && typeof action !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'Invalid action parameter' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // For test-connection, use provided credentials (admin testing new credentials)
     if (action === 'test-connection') {
       if (!clientId || !clientSecret || !tenantId) {
         return new Response(
           JSON.stringify({ error: 'Missing credentials for connection test' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Validate credential formats
+      if (typeof clientId !== 'string' || clientId.length > 500 ||
+          typeof clientSecret !== 'string' || clientSecret.length > 500 ||
+          typeof tenantId !== 'string' || tenantId.length > 100) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid credential format' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -171,12 +276,19 @@ serve(async (req) => {
       });
     }
 
-    // For other actions, fetch credentials from database
-    const { data: settings, error: settingsError } = await supabaseClient
+    // For other actions, fetch credentials from database using RLS
+    // RLS will ensure user can only access their tenant's settings
+    let settingsQuery = supabaseClient
       .from('cartoncloud_settings')
       .select('*')
-      .eq('is_active', true)
-      .maybeSingle();
+      .eq('is_active', true);
+
+    // Filter by user's tenant if they have one (super_users can see all via RLS)
+    if (userTenantId) {
+      settingsQuery = settingsQuery.eq('tenant_id', userTenantId);
+    }
+
+    const { data: settings, error: settingsError } = await settingsQuery.maybeSingle();
 
     if (settingsError) {
       console.error('Error fetching settings:', settingsError);
@@ -193,12 +305,24 @@ serve(async (req) => {
       );
     }
 
-    const accessToken = await getAccessToken(settings.client_id, settings.client_secret);
+    const accessToken = await getAccessToken(
+      settings.client_id, 
+      settings.client_secret,
+      settings.cartoncloud_tenant_id
+    );
 
     if (action === 'search-orders') {
       if (!searchTerm) {
         return new Response(
           JSON.stringify({ error: 'Search term is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Validate searchTerm
+      if (typeof searchTerm !== 'string' || searchTerm.length > 200) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid search term' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
