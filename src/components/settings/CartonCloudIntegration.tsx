@@ -21,6 +21,7 @@ import {
   useSaveCartonCloudSettings,
   useDeleteCartonCloudSettings,
   useTestCartonCloudConnection,
+  useTestSavedCartonCloudConnection,
 } from '@/hooks/useCartonCloudSettings';
 
 export function CartonCloudIntegration() {
@@ -28,6 +29,7 @@ export function CartonCloudIntegration() {
   const saveSettings = useSaveCartonCloudSettings();
   const deleteSettings = useDeleteCartonCloudSettings();
   const testConnection = useTestCartonCloudConnection();
+  const testSavedConnection = useTestSavedCartonCloudConnection();
 
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
@@ -49,19 +51,25 @@ export function CartonCloudIntegration() {
   }, [settings]);
 
   const handleTestConnection = async () => {
-    if (!clientId || !clientSecret || !tenantId) {
-      toast.error('Please fill in all fields');
-      return;
-    }
-
     setConnectionStatus('idle');
     
     try {
-      const result = await testConnection.mutateAsync({
-        clientId,
-        clientSecret,
-        tenantId,
-      });
+      let result;
+      
+      // If no new credentials entered but we have saved settings, test the saved connection
+      if (!clientId && !clientSecret && settings) {
+        result = await testSavedConnection.mutateAsync();
+      } else if (clientId && clientSecret && tenantId) {
+        // Test with new credentials
+        result = await testConnection.mutateAsync({
+          clientId,
+          clientSecret,
+          tenantId,
+        });
+      } else {
+        toast.error('Please fill in all fields or test existing connection');
+        return;
+      }
 
       if (result.success) {
         setConnectionStatus('success');
@@ -210,9 +218,13 @@ export function CartonCloudIntegration() {
           <Button
             onClick={handleTestConnection}
             variant="outline"
-            disabled={testConnection.isPending || !clientId || !clientSecret || !tenantId}
+            disabled={
+              testConnection.isPending || 
+              testSavedConnection.isPending || 
+              (!settings && (!clientId || !clientSecret || !tenantId))
+            }
           >
-            {testConnection.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            {(testConnection.isPending || testSavedConnection.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Test Connection
           </Button>
 
