@@ -35,12 +35,16 @@ export function CartonCloudIntegration() {
   const [showSecret, setShowSecret] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
+  // NOTE: Credentials (client_id, client_secret) are never exposed to the client for security.
+  // When settings exist, we only get metadata. User must re-enter credentials to update.
   useEffect(() => {
     if (settings) {
-      setClientId(settings.client_id);
-      setClientSecret(settings.client_secret);
+      // Only set tenant ID which is non-sensitive
       setTenantId(settings.cartoncloud_tenant_id);
       setConnectionStatus('success');
+      // Clear credential fields - they're stored securely but never returned
+      setClientId('');
+      setClientSecret('');
     }
   }, [settings]);
 
@@ -137,13 +141,21 @@ export function CartonCloudIntegration() {
       </p>
 
       <div className="space-y-4">
+        {isConnected && (
+          <div className="p-3 bg-muted/50 border border-border rounded-md">
+            <p className="text-sm text-muted-foreground">
+              Credentials are securely stored. Enter new values below to update them.
+            </p>
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="clientId">Client ID</Label>
           <Input
             id="clientId"
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
-            placeholder="Enter your CartonCloud Client ID"
+            placeholder={isConnected ? "Enter new Client ID to update" : "Enter your CartonCloud Client ID"}
           />
         </div>
 
@@ -155,7 +167,7 @@ export function CartonCloudIntegration() {
               type={showSecret ? 'text' : 'password'}
               value={clientSecret}
               onChange={(e) => setClientSecret(e.target.value)}
-              placeholder="Enter your CartonCloud Client Secret"
+              placeholder={isConnected ? "Enter new Client Secret to update" : "Enter your CartonCloud Client Secret"}
               className="pr-10"
             />
             <Button

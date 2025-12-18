@@ -2,15 +2,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantContext } from '@/hooks/useTenantContext';
 
+// NOTE: CartonCloud credentials (client_id, client_secret) are NEVER exposed to client.
+// They are only accessed server-side in edge functions with proper authorization.
+// This interface only contains non-sensitive metadata for UI state management.
 export interface CartonCloudSettings {
   id: string;
-  client_id: string;
-  client_secret: string;
   cartoncloud_tenant_id: string;
-  tenant_id: string | null; // app multi-tenancy
+  tenant_id: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // Indicates credentials exist (for UI state) without exposing actual values
+  has_credentials: boolean;
 }
 
 export function useCartonCloudSettings() {
@@ -19,9 +22,10 @@ export function useCartonCloudSettings() {
   return useQuery({
     queryKey: ['cartoncloud-settings', activeTenant?.id],
     queryFn: async () => {
+      // SECURITY: Only select non-sensitive columns - never client_id or client_secret
       let query = supabase
         .from('cartoncloud_settings')
-        .select('*');
+        .select('id, cartoncloud_tenant_id, tenant_id, is_active, created_at, updated_at');
       
       if (activeTenant?.id) {
         query = query.eq('tenant_id', activeTenant.id);
@@ -30,7 +34,14 @@ export function useCartonCloudSettings() {
       const { data, error } = await query.maybeSingle();
       
       if (error) throw error;
-      return data as CartonCloudSettings | null;
+      
+      if (!data) return null;
+      
+      // Return with has_credentials flag (we know they exist if record exists)
+      return {
+        ...data,
+        has_credentials: true,
+      } as CartonCloudSettings;
     },
     enabled: !!activeTenant?.id,
   });
