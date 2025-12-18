@@ -364,7 +364,68 @@ serve(async (req) => {
       });
     }
 
-    // For other actions, fetch credentials from database using RLS
+    // Test saved connection (for existing credentials in database)
+    if (action === 'test-saved-connection') {
+      // Fetch credentials from database using RLS
+      let settingsQuery = supabaseClient
+        .from('cartoncloud_settings')
+        .select('*')
+        .eq('is_active', true);
+
+      if (userTenantId) {
+        settingsQuery = settingsQuery.eq('tenant_id', userTenantId);
+      }
+
+      const { data: savedSettings, error: savedSettingsError } = await settingsQuery.maybeSingle();
+
+      if (savedSettingsError) {
+        console.error('Error fetching settings:', savedSettingsError);
+        return new Response(
+          JSON.stringify({ success: false, message: 'Failed to fetch CartonCloud settings' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!savedSettings) {
+        return new Response(
+          JSON.stringify({ success: false, message: 'CartonCloud integration not configured' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Decrypt credentials
+      let decClientId = savedSettings.client_id;
+      let decClientSecret = savedSettings.client_secret;
+
+      if (isEncrypted(savedSettings.client_id)) {
+        try {
+          decClientId = await decrypt(savedSettings.client_id);
+          decClientSecret = await decrypt(savedSettings.client_secret);
+        } catch (decryptError) {
+          console.error('Failed to decrypt credentials:', decryptError);
+          return new Response(
+            JSON.stringify({ success: false, message: 'Failed to decrypt credentials. Please re-save your CartonCloud settings.' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
+      logAudit('CARTONCLOUD_TEST_SAVED_CONNECTION', user.id, userTenantId, { 
+        settingsId: savedSettings.id,
+        cartoncloudTenantId: savedSettings.cartoncloud_tenant_id 
+      });
+
+      const result = await testConnection(decClientId, decClientSecret, savedSettings.cartoncloud_tenant_id);
+      
+      logAudit('CARTONCLOUD_TEST_SAVED_CONNECTION_RESULT', user.id, userTenantId, { 
+        success: result.success,
+        settingsId: savedSettings.id,
+      });
+
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     // RLS will ensure user can only access their tenant's settings
     let settingsQuery = supabaseClient
       .from('cartoncloud_settings')

@@ -141,3 +141,16 @@ export function useTestCartonCloudConnection() {
     },
   });
 }
+
+export function useTestSavedCartonCloudConnection() {
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('cartoncloud', {
+        body: { action: 'test-saved-connection' },
+      });
+
+      if (error) throw error;
+      return data;
+    },
+  });
+}
