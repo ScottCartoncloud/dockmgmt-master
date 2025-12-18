@@ -76,12 +76,35 @@ export default function Auth() {
       });
   }, [searchParams]);
 
-  // Redirect if already logged in
+  // Redirect if already logged in (except when arriving via an invite link)
   useEffect(() => {
-    if (user && !authLoading) {
+    const inviteToken = searchParams.get('invite');
+    if (user && !authLoading && !inviteToken) {
       navigate('/');
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, searchParams]);
+
+  // If a logged-in user opens an invite link, complete the invite acceptance
+  useEffect(() => {
+    const inviteToken = searchParams.get('invite');
+    if (!inviteToken || !user || authLoading) return;
+
+    setError(null);
+    setIsLoading(true);
+
+    supabase.functions
+      .invoke('accept-invite', { body: { inviteToken } })
+      .then(({ error }) => {
+        setIsLoading(false);
+        if (error) {
+          console.error('Error accepting invite:', error);
+          setError('Unable to accept invitation. Please ask your administrator to resend it.');
+          return;
+        }
+        // Reload to refresh profile/tenant context after backend updates
+        window.location.assign('/');
+      });
+  }, [searchParams, user, authLoading]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,15 +154,34 @@ export default function Auth() {
 
     setIsLoading(true);
     const { error } = await signUp(signupEmail, signupPassword, signupName);
-    setIsLoading(false);
 
     if (error) {
+      setIsLoading(false);
       if (error.message.includes('already registered')) {
         setError('This email is already registered. Please login instead.');
       } else {
         setError(error.message);
       }
+      return;
     }
+
+    // Complete invite acceptance (attach tenant + role) after signup
+    const inviteToken = searchParams.get('invite');
+    const { error: acceptError } = await supabase.functions.invoke('accept-invite', {
+      body: { inviteToken },
+    });
+
+    setIsLoading(false);
+
+    if (acceptError) {
+      console.error('Error accepting invite after signup:', acceptError);
+      setError(
+        'Your account was created, but we could not complete the invitation. Please verify your email and reopen the invite link.'
+      );
+      return;
+    }
+
+    window.location.assign('/');
   };
 
   const handleGoogleSignIn = async () => {
