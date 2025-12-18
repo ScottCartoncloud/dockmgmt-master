@@ -18,17 +18,27 @@ export type DockDoorInsert = Omit<DockDoor, 'id' | 'created_at' | 'updated_at'>;
 export type DockDoorUpdate = Partial<DockDoorInsert> & { id: string };
 
 export function useDockDoors() {
+  const { activeTenant } = useTenantContext();
+  
   return useQuery({
-    queryKey: ['dock-doors'],
+    queryKey: ['dock-doors', activeTenant?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('dock_doors')
         .select('*')
         .order('sort_order', { ascending: true });
       
+      // Filter by tenant if one is active
+      if (activeTenant?.id) {
+        query = query.eq('tenant_id', activeTenant.id);
+      }
+      
+      const { data, error } = await query;
+      
       if (error) throw error;
       return data as DockDoor[];
     },
+    enabled: !!activeTenant?.id,
   });
 }
 
