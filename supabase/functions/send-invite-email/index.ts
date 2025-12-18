@@ -155,6 +155,12 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Construct signup URL server-side using trusted APP_BASE_URL
     const signupUrl = `${APP_BASE_URL}/auth?invite=${inviteToken}`;
+    
+    // CartonCloud logo - hosted publicly
+    const logoUrl = 'https://www.cartoncloud.com/wp-content/uploads/2023/03/logo-white.svg';
+    
+    // CartonCloud brand blue matching the app header: HSL(206, 95%, 36%)
+    const brandBlue = '#0580c7';
 
     // Sanitize all user-provided values for HTML template
     const safeTenantName = escapeHtml(tenant.name);
@@ -176,15 +182,15 @@ const handler = async (req: Request): Promise<Response> => {
               <table width="600" cellpadding="0" cellspacing="0" style="max-width: 600px;">
                 <!-- Header -->
                 <tr>
-                  <td style="background-color: #1e3a5f; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+                  <td style="background-color: ${brandBlue}; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+                    <img src="${logoUrl}" alt="CartonCloud" style="height: 40px; margin-bottom: 12px;" />
                     <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">Dock Management</h1>
-                    <p style="color: #a0c4ff; margin: 10px 0 0 0; font-size: 14px;">By CartonCloud</p>
                   </td>
                 </tr>
                 <!-- Body -->
                 <tr>
                   <td style="background-color: #ffffff; padding: 30px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px;">
-                    <h2 style="color: #1e3a5f; margin-top: 0; font-size: 22px;">You're Invited!</h2>
+                    <h2 style="color: ${brandBlue}; margin-top: 0; font-size: 22px;">You're Invited!</h2>
                     
                     <p style="margin: 16px 0;">Hello,</p>
                     
@@ -195,7 +201,7 @@ const handler = async (req: Request): Promise<Response> => {
                     <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
                       <tr>
                         <td align="center">
-                          <a href="${signupUrl}" style="background-color: #1e3a5f; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Accept Invitation</a>
+                          <a href="${signupUrl}" style="background-color: ${brandBlue}; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Accept Invitation</a>
                         </td>
                       </tr>
                     </table>
