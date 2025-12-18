@@ -8,6 +8,7 @@ const corsHeaders = {
 };
 
 const CARTONCLOUD_API_BASE = 'https://api.cartoncloud.com';
+const ENCRYPTION_KEY = Deno.env.get('CREDENTIALS_ENCRYPTION_KEY');
 
 interface TokenCache {
   accessToken: string;
@@ -28,6 +29,69 @@ function logAudit(action: string, userId: string, tenantId: string | null, detai
   };
   // Log to console (captured by Supabase logs)
   console.log('[AUDIT]', JSON.stringify(logEntry));
+}
+
+// Decryption utilities using Web Crypto API
+async function getEncryptionKey(): Promise<CryptoKey> {
+  if (!ENCRYPTION_KEY) {
+    throw new Error('Encryption key not configured');
+  }
+  
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(ENCRYPTION_KEY);
+  
+  const baseKey = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    'PBKDF2',
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+  
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: encoder.encode('cartoncloud-credentials-v1'),
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function decrypt(ciphertext: string): Promise<string> {
+  const key = await getEncryptionKey();
+  
+  // Decode base64
+  const combined = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
+  
+  // Extract IV (first 12 bytes) and ciphertext
+  const iv = combined.slice(0, 12);
+  const encryptedData = combined.slice(12);
+  
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    encryptedData
+  );
+  
+  return new TextDecoder().decode(decrypted);
+}
+
+// Check if value is encrypted (base64 encoded with specific length characteristics)
+function isEncrypted(value: string): boolean {
+  // Encrypted values are base64 and typically longer due to IV + ciphertext
+  // Minimum: 12 bytes IV + some ciphertext + auth tag = at least 44 chars in base64
+  if (value.length < 44) return false;
+  try {
+    atob(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function getAccessToken(clientId: string, clientSecret: string, tenantId: string): Promise<string> {
@@ -336,9 +400,27 @@ serve(async (req) => {
       cartoncloudTenantId: settings.cartoncloud_tenant_id,
     });
 
+    // Decrypt credentials if they are encrypted
+    let decryptedClientId = settings.client_id;
+    let decryptedClientSecret = settings.client_secret;
+
+    if (isEncrypted(settings.client_id)) {
+      console.log('Decrypting stored credentials');
+      try {
+        decryptedClientId = await decrypt(settings.client_id);
+        decryptedClientSecret = await decrypt(settings.client_secret);
+      } catch (decryptError) {
+        console.error('Failed to decrypt credentials:', decryptError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to decrypt credentials. Please re-save your CartonCloud settings.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     const accessToken = await getAccessToken(
-      settings.client_id, 
-      settings.client_secret,
+      decryptedClientId, 
+      decryptedClientSecret,
       settings.cartoncloud_tenant_id
     );
 
