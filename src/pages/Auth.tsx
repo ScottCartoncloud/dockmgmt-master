@@ -49,31 +49,31 @@ export default function Auth() {
   // Check for invite token
   useEffect(() => {
     const inviteToken = searchParams.get('invite');
-    if (inviteToken) {
-      setActiveTab('signup');
-      
-      // Fetch invite info using the token (which is the invite ID)
-      supabase
-        .from('tenant_invites')
-        .select('id, email, tenants(name)')
-        .eq('id', inviteToken)
-        .is('accepted_at', null)
-        .gt('expires_at', new Date().toISOString())
-        .maybeSingle()
-        .then(({ data, error }) => {
-          if (error) {
-            console.error('Error fetching invite:', error);
-            return;
-          }
-          if (data) {
-            setSignupEmail(data.email);
-            setInviteInfo({
-              email: data.email,
-              tenantName: (data.tenants as any)?.name || 'Unknown',
-            });
-          }
-        });
+
+    if (!inviteToken) {
+      setInviteInfo(null);
+      return;
     }
+
+    setActiveTab('signup');
+    setInviteInfo(null);
+
+    supabase.functions
+      .invoke('invite-info', { body: { inviteToken } })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Error fetching invite info:', error);
+          return;
+        }
+
+        if (data?.email) {
+          setSignupEmail(String(data.email));
+          setInviteInfo({
+            email: String(data.email),
+            tenantName: String(data.tenantName ?? 'Unknown'),
+          });
+        }
+      });
   }, [searchParams]);
 
   // Redirect if already logged in
@@ -122,17 +122,10 @@ export default function Auth() {
       return;
     }
 
-    // Check if there's an invite for this email
-    const { data: invite } = await supabase
-      .from('tenant_invites')
-      .select('id')
-      .eq('email', signupEmail)
-      .is('accepted_at', null)
-      .gt('expires_at', new Date().toISOString())
-      .maybeSingle();
-
-    if (!invite && !inviteInfo) {
-      setError('Signup requires an invitation. Please contact your administrator.');
+    // Invites are link-based: require a valid invite token in the URL.
+    const inviteToken = searchParams.get('invite');
+    if (!inviteToken || !inviteInfo || inviteInfo.email.toLowerCase() !== signupEmail.toLowerCase()) {
+      setError('Signup requires a valid invitation link. Please contact your administrator.');
       return;
     }
 
