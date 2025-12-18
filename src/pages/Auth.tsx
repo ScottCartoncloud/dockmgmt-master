@@ -13,6 +13,8 @@ import { Loader2, Mail, Lock, User, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import cartonCloudLogo from '@/assets/cartoncloud-logo.png';
 
+const PENDING_INVITE_KEY = 'dockmgmt_pending_invite';
+
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
@@ -37,6 +39,7 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inviteInfo, setInviteInfo] = useState<{ email: string; tenantName: string } | null>(null);
+  const [processingInvite, setProcessingInvite] = useState(false);
   
   // Form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -46,7 +49,38 @@ export default function Auth() {
   const [signupPassword, setSignupPassword] = useState('');
   const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
 
-  // Check for invite token
+  // Get invite token from URL or localStorage (for OAuth redirect recovery)
+  const getInviteToken = (): string | null => {
+    const urlToken = searchParams.get('invite');
+    if (urlToken) return urlToken;
+    
+    // Check localStorage for token saved before OAuth redirect
+    try {
+      return localStorage.getItem(PENDING_INVITE_KEY);
+    } catch {
+      return null;
+    }
+  };
+
+  // Save invite token to localStorage before OAuth redirect
+  const saveInviteToken = (token: string) => {
+    try {
+      localStorage.setItem(PENDING_INVITE_KEY, token);
+    } catch {
+      // Ignore storage errors
+    }
+  };
+
+  // Clear saved invite token
+  const clearInviteToken = () => {
+    try {
+      localStorage.removeItem(PENDING_INVITE_KEY);
+    } catch {
+      // Ignore storage errors
+    }
+  };
+
+  // Check for invite token and fetch info
   useEffect(() => {
     const inviteToken = searchParams.get('invite');
 
@@ -54,6 +88,9 @@ export default function Auth() {
       setInviteInfo(null);
       return;
     }
+
+    // Save token for OAuth redirect recovery
+    saveInviteToken(inviteToken);
 
     setActiveTab('signup');
     setInviteInfo(null);
@@ -76,35 +113,49 @@ export default function Auth() {
       });
   }, [searchParams]);
 
-  // Redirect if already logged in (except when arriving via an invite link)
+  // Process pending invite for logged-in user (handles both direct invite links AND OAuth redirects)
   useEffect(() => {
-    const inviteToken = searchParams.get('invite');
-    if (user && !authLoading && !inviteToken) {
+    if (!user || authLoading || processingInvite) return;
+
+    const inviteToken = getInviteToken();
+    if (!inviteToken) {
+      // No pending invite, redirect to home
       navigate('/');
+      return;
     }
-  }, [user, authLoading, navigate, searchParams]);
 
-  // If a logged-in user opens an invite link, complete the invite acceptance
-  useEffect(() => {
-    const inviteToken = searchParams.get('invite');
-    if (!inviteToken || !user || authLoading) return;
-
+    // Process the invite
+    setProcessingInvite(true);
     setError(null);
     setIsLoading(true);
 
+    console.log('[Auth] Processing pending invite for user:', user.email);
+
     supabase.functions
       .invoke('accept-invite', { body: { inviteToken } })
-      .then(({ error }) => {
+      .then(({ data, error }) => {
         setIsLoading(false);
+        setProcessingInvite(false);
+        
+        // Clear the saved token regardless of outcome
+        clearInviteToken();
+
         if (error) {
           console.error('Error accepting invite:', error);
-          setError('Unable to accept invitation. Please ask your administrator to resend it.');
+          // Check if it's just an email mismatch (user logged in with different account)
+          if (error.message?.includes('mismatch')) {
+            setError('The invite was sent to a different email address. Please sign in with the correct account or ask for a new invite.');
+          } else {
+            setError('Unable to accept invitation. Please ask your administrator to resend it.');
+          }
           return;
         }
+
+        console.log('[Auth] Invite accepted successfully:', data);
         // Reload to refresh profile/tenant context after backend updates
         window.location.assign('/');
       });
-  }, [searchParams, user, authLoading]);
+  }, [user, authLoading, processingInvite, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,6 +178,7 @@ export default function Auth() {
         setError(error.message);
       }
     }
+    // If login succeeds and there's a pending invite, the useEffect will handle it
   };
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -145,8 +197,8 @@ export default function Auth() {
       return;
     }
 
-    // Invites are link-based: require a valid invite token in the URL.
-    const inviteToken = searchParams.get('invite');
+    // Invites are link-based: require a valid invite token
+    const inviteToken = getInviteToken();
     if (!inviteToken || !inviteInfo || inviteInfo.email.toLowerCase() !== signupEmail.toLowerCase()) {
       setError('Signup requires a valid invitation link. Please contact your administrator.');
       return;
@@ -171,6 +223,9 @@ export default function Auth() {
     });
 
     setIsLoading(false);
+    
+    // Clear the saved token
+    clearInviteToken();
 
     if (acceptError) {
       console.error('Error accepting invite after signup:', acceptError);
@@ -185,16 +240,40 @@ export default function Auth() {
 
   const handleGoogleSignIn = async () => {
     setError(null);
+    
+    // Ensure invite token is saved before OAuth redirect
+    const inviteToken = getInviteToken();
+    if (inviteToken) {
+      saveInviteToken(inviteToken);
+      console.log('[Auth] Saved invite token before Google OAuth:', inviteToken);
+    }
+    
     const { error } = await signInWithGoogle();
     if (error) {
       setError(error.message);
     }
+    // After OAuth completes and redirects back, the useEffect will detect the pending invite
   };
 
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-header">
         <Loader2 className="w-8 h-8 animate-spin text-white" />
+      </div>
+    );
+  }
+
+  // Show loading state while processing invite
+  if (processingInvite || (user && getInviteToken())) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-header p-4">
+        <Card className="w-full max-w-md border-0 shadow-2xl">
+          <CardContent className="pt-8 pb-6 text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-accent mx-auto mb-4" />
+            <p className="text-foreground font-medium">Completing your invitation...</p>
+            <p className="text-sm text-muted-foreground mt-2">Please wait while we set up your account.</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
