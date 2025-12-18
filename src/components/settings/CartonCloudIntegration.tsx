@@ -86,7 +86,9 @@ export function CartonCloudIntegration() {
       });
       toast.success('CartonCloud settings saved successfully');
     } catch (error) {
-      toast.error('Failed to save settings');
+      console.error('Save settings error:', error);
+      const message = error instanceof Error ? error.message : 'Failed to save settings';
+      toast.error(message);
     }
   };
 
