@@ -6,8 +6,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
@@ -18,13 +16,19 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 export function TenantSwitcher() {
   const navigate = useNavigate();
   const { tenants, activeTenant, setActiveTenant, isLoading } = useTenantContext();
-  const { isSuperUser } = useAuth();
+  const { isSuperUser, isAdmin } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [open, setOpen] = useState(false);
 
   const filteredTenants = tenants.filter(tenant =>
     tenant.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Show dropdown only for super_user OR admin with more than one tenant
+  const canSwitchTenants = isSuperUser || (isAdmin && tenants.length > 1);
+
+  // Show Administration option only for super_user
+  const canAccessAdmin = isSuperUser;
 
   const handleTenantSelect = (tenant: typeof tenants[0]) => {
     setActiveTenant(tenant);
@@ -36,6 +40,27 @@ export function TenantSwitcher() {
     setOpen(false);
     navigate('/admin');
   };
+
+  // Read-only display when user cannot switch tenants
+  if (!canSwitchTenants) {
+    return (
+      <div className="flex items-center gap-2 px-2">
+        <div className="w-8 h-8 bg-accent rounded flex items-center justify-center">
+          <Truck className="w-5 h-5 text-accent-foreground" />
+        </div>
+        <div className="flex flex-col items-start">
+          <span className="font-semibold text-lg text-header-foreground leading-tight">
+            {activeTenant?.name || 'Dock Management'}
+          </span>
+          {activeTenant && (
+            <span className="text-[10px] text-header-foreground/60 leading-tight">
+              Dock Management
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -65,23 +90,23 @@ export function TenantSwitcher() {
         className="w-72 bg-header border-header-foreground/20"
         sideOffset={8}
       >
-        {/* Header - Administration link */}
-        <div 
-          className="px-3 py-2 border-b border-header-foreground/20 cursor-pointer hover:bg-header-foreground/10 transition-colors"
-          onClick={handleAdminClick}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-header-foreground">
-              Administration
-            </span>
-            {isSuperUser && (
+        {/* Header - Administration link (only for super_user) */}
+        {canAccessAdmin && (
+          <div 
+            className="px-3 py-2 border-b border-header-foreground/20 cursor-pointer hover:bg-header-foreground/10 transition-colors"
+            onClick={handleAdminClick}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-header-foreground">
+                Administration
+              </span>
               <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 bg-header-foreground/10 text-header-foreground rounded-full">
                 <Shield className="w-3 h-3" />
                 Super User
               </span>
-            )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Search input */}
         <div className="p-2 border-b border-header-foreground/20">
