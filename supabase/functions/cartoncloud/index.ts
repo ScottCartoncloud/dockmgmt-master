@@ -17,6 +17,19 @@ interface TokenCache {
 
 let tokenCache: TokenCache | null = null;
 
+// Audit logging for security-sensitive operations
+function logAudit(action: string, userId: string, tenantId: string | null, details: Record<string, any> = {}) {
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    action,
+    userId,
+    tenantId,
+    ...details,
+  };
+  // Log to console (captured by Supabase logs)
+  console.log('[AUDIT]', JSON.stringify(logEntry));
+}
+
 async function getAccessToken(clientId: string, clientSecret: string, tenantId: string): Promise<string> {
   // Check if we have a valid cached token for the same tenant
   if (tokenCache && tokenCache.tenantId === tenantId && Date.now() < tokenCache.expiresAt - 60000) {
@@ -270,7 +283,18 @@ serve(async (req) => {
         );
       }
       
+      logAudit('CARTONCLOUD_TEST_CONNECTION', user.id, userTenantId, { 
+        success: 'pending',
+        cartoncloudTenantId: tenantId 
+      });
+      
       const result = await testConnection(clientId, clientSecret, tenantId);
+      
+      logAudit('CARTONCLOUD_TEST_CONNECTION_RESULT', user.id, userTenantId, { 
+        success: result.success,
+        cartoncloudTenantId: tenantId 
+      });
+      
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -304,6 +328,13 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Audit log: credentials being accessed server-side
+    logAudit('CARTONCLOUD_CREDENTIALS_ACCESS', user.id, userTenantId, {
+      action,
+      settingsId: settings.id,
+      cartoncloudTenantId: settings.cartoncloud_tenant_id,
+    });
 
     const accessToken = await getAccessToken(
       settings.client_id, 
