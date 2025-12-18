@@ -78,7 +78,7 @@ const handler = async (req: Request): Promise<Response> => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Dock Management <onboarding@resend.dev>",
+        from: "Dock Management <noreply@dockmgmt.cartoncloud.com>",
         to: [email],
         subject: `You've been invited to join ${tenantName} on Dock Management`,
         html: emailHtml,
