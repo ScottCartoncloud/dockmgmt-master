@@ -48,21 +48,25 @@ export default function Auth() {
 
   // Check for invite token
   useEffect(() => {
-    const inviteEmail = searchParams.get('invite');
-    if (inviteEmail) {
+    const inviteToken = searchParams.get('invite');
+    if (inviteToken) {
       setActiveTab('signup');
-      setSignupEmail(decodeURIComponent(inviteEmail));
       
-      // Fetch invite info
+      // Fetch invite info using the token (which is the invite ID)
       supabase
         .from('tenant_invites')
-        .select('email, tenants(name)')
-        .eq('email', decodeURIComponent(inviteEmail))
+        .select('id, email, tenants(name)')
+        .eq('id', inviteToken)
         .is('accepted_at', null)
         .gt('expires_at', new Date().toISOString())
         .maybeSingle()
-        .then(({ data }) => {
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Error fetching invite:', error);
+            return;
+          }
           if (data) {
+            setSignupEmail(data.email);
             setInviteInfo({
               email: data.email,
               tenantName: (data.tenants as any)?.name || 'Unknown',
