@@ -7,14 +7,21 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DoorOpen, Link2, Users, Clock, LayoutGrid } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 
 const Settings = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { isAdmin, isSuperUser } = useAuth();
   const activeTab = searchParams.get('tab') || 'docks';
+
+  const canAccessIntegration = isAdmin || isSuperUser;
 
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value });
   };
+
+  // Calculate grid columns based on available tabs
+  const tabCount = canAccessIntegration ? 5 : 4;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -27,7 +34,7 @@ const Settings = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
+          <TabsList className={`grid w-full grid-cols-${tabCount} lg:w-auto lg:inline-grid`}>
             <TabsTrigger value="docks" className="gap-2">
               <DoorOpen className="w-4 h-4" />
               <span className="hidden sm:inline">Docks</span>
@@ -36,10 +43,12 @@ const Settings = () => {
               <LayoutGrid className="w-4 h-4" />
               <span className="hidden sm:inline">Cards</span>
             </TabsTrigger>
-            <TabsTrigger value="integration" className="gap-2">
-              <Link2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Integration</span>
-            </TabsTrigger>
+            {canAccessIntegration && (
+              <TabsTrigger value="integration" className="gap-2">
+                <Link2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Integration</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="users" className="gap-2">
               <Users className="w-4 h-4" />
               <span className="hidden sm:inline">Users</span>
@@ -66,13 +75,15 @@ const Settings = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="integration">
-            <Card>
-              <CardContent className="pt-6">
-                <CartonCloudIntegration />
-              </CardContent>
-            </Card>
-          </TabsContent>
+          {canAccessIntegration && (
+            <TabsContent value="integration">
+              <Card>
+                <CardContent className="pt-6">
+                  <CartonCloudIntegration />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
 
           <TabsContent value="users">
             <Card>
