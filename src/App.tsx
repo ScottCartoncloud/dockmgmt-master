@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
+import EmailPreview from "./pages/EmailPreview";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,11 @@ const App = () => (
               <Route path="/admin" element={
                 <ProtectedRoute requiredRole="super_user">
                   <Admin />
+                </ProtectedRoute>
+              } />
+              <Route path="/email-preview" element={
+                <ProtectedRoute>
+                  <EmailPreview />
                 </ProtectedRoute>
               } />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
