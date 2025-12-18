@@ -174,8 +174,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    // Clear any pending invite on logout
+    // Clear any pending invite and cached tenant on logout
     localStorage.removeItem(PENDING_INVITE_KEY);
+    localStorage.removeItem('crossdock_active_tenant');
     await supabase.auth.signOut();
     setProfile(null);
     setRoles([]);

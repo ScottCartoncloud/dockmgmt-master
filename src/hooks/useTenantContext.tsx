@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface Tenant {
   id: string;
@@ -23,6 +24,7 @@ const DEV_BYPASS_AUTH = false;
 
 export function TenantProvider({ children }: { children: React.ReactNode }) {
   const { user, isSuperUser, profile } = useAuth();
+  const queryClient = useQueryClient();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [activeTenant, setActiveTenantState] = useState<Tenant | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -145,7 +147,9 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     } else {
       localStorage.removeItem(ACTIVE_TENANT_KEY);
     }
-  }, []);
+    // Clear all cached queries to ensure fresh data for new tenant
+    queryClient.clear();
+  }, [queryClient]);
 
   return (
     <TenantContext.Provider value={{ tenants, activeTenant, setActiveTenant, isLoading }}>
