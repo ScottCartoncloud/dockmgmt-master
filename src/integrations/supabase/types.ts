@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string | null
+          id: string
+          ip_address: string | null
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string
+          table_name: string
+          tenant_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          ip_address?: string | null
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id: string
+          table_name: string
+          tenant_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          ip_address?: string | null
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string
+          table_name?: string
+          tenant_id?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookings: {
         Row: {
           carrier: string | null
@@ -30,7 +80,7 @@ export type Database = {
           purchase_order_id: string | null
           start_time: string
           status: string
-          tenant_id: string | null
+          tenant_id: string
           title: string
           truck_rego: string | null
           updated_at: string
@@ -50,7 +100,7 @@ export type Database = {
           purchase_order_id?: string | null
           start_time: string
           status?: string
-          tenant_id?: string | null
+          tenant_id: string
           title: string
           truck_rego?: string | null
           updated_at?: string
@@ -70,7 +120,7 @@ export type Database = {
           purchase_order_id?: string | null
           start_time?: string
           status?: string
-          tenant_id?: string | null
+          tenant_id?: string
           title?: string
           truck_rego?: string | null
           updated_at?: string
@@ -143,7 +193,7 @@ export type Database = {
           label: string
           options: Json | null
           sort_order: number
-          tenant_id: string | null
+          tenant_id: string
           updated_at: string
         }
         Insert: {
@@ -155,7 +205,7 @@ export type Database = {
           label: string
           options?: Json | null
           sort_order?: number
-          tenant_id?: string | null
+          tenant_id: string
           updated_at?: string
         }
         Update: {
@@ -167,7 +217,7 @@ export type Database = {
           label?: string
           options?: Json | null
           sort_order?: number
-          tenant_id?: string | null
+          tenant_id?: string
           updated_at?: string
         }
         Relationships: [
@@ -188,7 +238,7 @@ export type Database = {
           is_active: boolean
           name: string
           sort_order: number
-          tenant_id: string | null
+          tenant_id: string
           updated_at: string
         }
         Insert: {
@@ -198,7 +248,7 @@ export type Database = {
           is_active?: boolean
           name: string
           sort_order?: number
-          tenant_id?: string | null
+          tenant_id: string
           updated_at?: string
         }
         Update: {
@@ -208,7 +258,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           sort_order?: number
-          tenant_id?: string | null
+          tenant_id?: string
           updated_at?: string
         }
         Relationships: [
@@ -356,6 +406,12 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "operator" | "viewer" | "super_user"
+      booking_status:
+        | "scheduled"
+        | "arrived"
+        | "in_progress"
+        | "completed"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -484,6 +540,13 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "operator", "viewer", "super_user"],
+      booking_status: [
+        "scheduled",
+        "arrived",
+        "in_progress",
+        "completed",
+        "cancelled",
+      ],
     },
   },
 } as const

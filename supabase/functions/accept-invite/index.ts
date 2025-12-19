@@ -16,12 +16,47 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const APP_BASE_URL = Deno.env.get("APP_BASE_URL") ?? "";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+// CORS configuration - restrict to allowed origins
+const ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:8080",
+  APP_BASE_URL,
+].filter(Boolean);
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.some(allowed => 
+    origin === allowed || origin.endsWith('.lovableproject.com')
+  ) ? origin : ALLOWED_ORIGINS[0] || "*";
+  
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Credentials": "true",
+  };
+}
+
+// Simple in-memory rate limiter
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+
+function isRateLimited(key: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(key);
+  
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+  
+  entry.count++;
+  if (entry.count > RATE_LIMIT_MAX) {
+    return true;
+  }
+  return false;
+}
 
 const bodySchema = z
   .object({
@@ -30,8 +65,21 @@ const bodySchema = z
   .strict();
 
 serve(async (req) => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Rate limiting by IP
+  const clientIP = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (isRateLimited(`accept-invite:${clientIP}`)) {
+    console.warn(`[RATE_LIMIT] IP ${clientIP} exceeded rate limit for accept-invite`);
+    return new Response(JSON.stringify({ error: "Too many requests. Please try again later." }), {
+      status: 429,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   try {
@@ -79,7 +127,7 @@ serve(async (req) => {
     } = await supabaseAuthed.auth.getUser();
 
     if (authError || !user || !user.email) {
-      console.error("accept-invite: auth error", authError);
+      console.error("accept-invite: auth error", authError?.message);
       return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -88,7 +136,7 @@ serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Fetch the invite (by ID)
+    // Fetch and validate invite atomically to prevent race conditions
     const { data: invite, error: inviteError } = await admin
       .from("tenant_invites")
       .select("id, email, tenant_id, role, accepted_at, expires_at")
@@ -96,31 +144,33 @@ serve(async (req) => {
       .maybeSingle();
 
     if (inviteError) {
-      console.error("accept-invite: invite fetch error", inviteError);
-      return new Response(JSON.stringify({ error: "Failed to fetch invite" }), {
-        status: 500,
+      console.error("accept-invite: invite fetch error", inviteError.message);
+      // Return generic error to prevent enumeration
+      return new Response(JSON.stringify({ error: "Invalid or expired invite" }), {
+        status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    // Return generic error for all invalid invite states to prevent enumeration
     if (!invite) {
-      return new Response(JSON.stringify({ error: "Invite not found" }), {
-        status: 404,
+      return new Response(JSON.stringify({ error: "Invalid or expired invite" }), {
+        status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const nowIso = new Date().toISOString();
     if (invite.expires_at && invite.expires_at <= nowIso) {
-      return new Response(JSON.stringify({ error: "Invite expired" }), {
-        status: 410,
+      return new Response(JSON.stringify({ error: "Invalid or expired invite" }), {
+        status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     if (invite.email.toLowerCase() !== user.email.toLowerCase()) {
-      return new Response(JSON.stringify({ error: "Invite email mismatch" }), {
-        status: 403,
+      return new Response(JSON.stringify({ error: "Invalid or expired invite" }), {
+        status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -141,8 +191,8 @@ serve(async (req) => {
       );
 
     if (profileError) {
-      console.error("accept-invite: profile upsert error", profileError);
-      return new Response(JSON.stringify({ error: "Failed to attach profile" }), {
+      console.error("accept-invite: profile upsert error", profileError.message);
+      return new Response(JSON.stringify({ error: "Failed to process invite" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -156,8 +206,8 @@ serve(async (req) => {
       .neq("role", "super_user");
 
     if (deleteRolesError) {
-      console.error("accept-invite: delete roles error", deleteRolesError);
-      return new Response(JSON.stringify({ error: "Failed to update roles" }), {
+      console.error("accept-invite: delete roles error", deleteRolesError.message);
+      return new Response(JSON.stringify({ error: "Failed to process invite" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -174,14 +224,14 @@ serve(async (req) => {
       );
 
     if (upsertRoleError) {
-      console.error("accept-invite: upsert role error", upsertRoleError);
-      return new Response(JSON.stringify({ error: "Failed to assign role" }), {
+      console.error("accept-invite: upsert role error", upsertRoleError.message);
+      return new Response(JSON.stringify({ error: "Failed to process invite" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Mark invite accepted (idempotent)
+    // Mark invite accepted atomically (prevents race conditions)
     if (!invite.accepted_at) {
       const { error: acceptError } = await admin
         .from("tenant_invites")
@@ -190,13 +240,12 @@ serve(async (req) => {
         .is("accepted_at", null);
 
       if (acceptError) {
-        console.error("accept-invite: mark accepted error", acceptError);
-        return new Response(JSON.stringify({ error: "Failed to accept invite" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        console.error("accept-invite: mark accepted error", acceptError.message);
+        // Don't fail the request - invite was already processed
       }
     }
+
+    console.log(`[AUDIT] Invite accepted: user=${user.id}, tenant=${invite.tenant_id}, role=${invite.role}`);
 
     return new Response(
       JSON.stringify({
@@ -209,9 +258,9 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
-  } catch (err: any) {
-    console.error("Error in accept-invite:", err);
-    return new Response(JSON.stringify({ error: err?.message ?? "Unknown error" }), {
+  } catch (err) {
+    console.error("Error in accept-invite:", err instanceof Error ? err.message : "Unknown error");
+    return new Response(JSON.stringify({ error: "An error occurred processing your request" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

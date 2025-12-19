@@ -2,13 +2,49 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
 const CARTONCLOUD_API_BASE = 'https://api.cartoncloud.com';
 const ENCRYPTION_KEY = Deno.env.get('CREDENTIALS_ENCRYPTION_KEY');
+const APP_BASE_URL = Deno.env.get("APP_BASE_URL") ?? "";
+
+// CORS configuration - restrict to allowed origins
+const ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:8080",
+  APP_BASE_URL,
+].filter(Boolean);
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.some(allowed => 
+    origin === allowed || origin.endsWith('.lovableproject.com')
+  ) ? origin : ALLOWED_ORIGINS[0] || "*";
+  
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Credentials": "true",
+  };
+}
+
+// Simple in-memory rate limiter
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+
+function isRateLimited(key: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(key);
+  
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+  
+  entry.count++;
+  if (entry.count > RATE_LIMIT_MAX) {
+    return true;
+  }
+  return false;
+}
 
 interface TokenCache {
   accessToken: string;
@@ -27,7 +63,6 @@ function logAudit(action: string, userId: string, tenantId: string | null, detai
     tenantId,
     ...details,
   };
-  // Log to console (captured by Supabase logs)
   console.log('[AUDIT]', JSON.stringify(logEntry));
 }
 
@@ -83,8 +118,6 @@ async function decrypt(ciphertext: string): Promise<string> {
 
 // Check if value is encrypted (base64 encoded with specific length characteristics)
 function isEncrypted(value: string): boolean {
-  // Encrypted values are base64 and typically longer due to IV + ciphertext
-  // Minimum: 12 bytes IV + some ciphertext + auth tag = at least 44 chars in base64
   if (value.length < 44) return false;
   try {
     atob(value);
@@ -95,7 +128,6 @@ function isEncrypted(value: string): boolean {
 }
 
 async function getAccessToken(clientId: string, clientSecret: string, tenantId: string): Promise<string> {
-  // Check if we have a valid cached token for the same tenant
   if (tokenCache && tokenCache.tenantId === tenantId && Date.now() < tokenCache.expiresAt - 60000) {
     console.log('Using cached access token');
     return tokenCache.accessToken;
@@ -104,32 +136,40 @@ async function getAccessToken(clientId: string, clientSecret: string, tenantId: 
   console.log('Fetching new access token from CartonCloud');
   const credentials = btoa(`${clientId}:${clientSecret}`);
   
-  const response = await fetch(`${CARTONCLOUD_API_BASE}/uaa/oauth/token`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Basic ${credentials}`,
-      'Accept-Version': '1',
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: 'grant_type=client_credentials',
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Token fetch failed:', response.status, errorText);
-    throw new Error(`Failed to get access token: ${response.status} - ${errorText}`);
-  }
-
-  const data = await response.json();
-  console.log('Access token obtained, expires in:', data.expires_in, 'seconds');
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
   
-  tokenCache = {
-    accessToken: data.access_token,
-    expiresAt: Date.now() + (data.expires_in * 1000),
-    tenantId,
-  };
+  try {
+    const response = await fetch(`${CARTONCLOUD_API_BASE}/uaa/oauth/token`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Accept-Version': '1',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'grant_type=client_credentials',
+      signal: controller.signal,
+    });
 
-  return data.access_token;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Token fetch failed:', response.status, errorText);
+      throw new Error(`Failed to get access token: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Access token obtained, expires in:', data.expires_in, 'seconds');
+    
+    tokenCache = {
+      accessToken: data.access_token,
+      expiresAt: Date.now() + (data.expires_in * 1000),
+      tenantId,
+    };
+
+    return data.access_token;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 async function searchInboundOrders(
@@ -159,28 +199,36 @@ async function searchInboundOrders(
     },
   };
 
-  const response = await fetch(
-    `${CARTONCLOUD_API_BASE}/tenants/${tenantId}/inbound-orders/search`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept-Version': '1',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(searchPayload),
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+  
+  try {
+    const response = await fetch(
+      `${CARTONCLOUD_API_BASE}/tenants/${tenantId}/inbound-orders/search`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept-Version': '1',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(searchPayload),
+        signal: controller.signal,
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Search failed:', response.status, errorText);
+      throw new Error(`Search failed: ${response.status}`);
     }
-  );
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Search failed:', response.status, errorText);
-    throw new Error(`Search failed: ${response.status} - ${errorText}`);
+    const results = await response.json();
+    console.log('Search returned', results.length, 'results');
+    return results;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const results = await response.json();
-  console.log('Search returned', results.length, 'results');
-  return results;
 }
 
 async function testConnection(
@@ -191,28 +239,35 @@ async function testConnection(
   try {
     const accessToken = await getAccessToken(clientId, clientSecret, tenantId);
     
-    // Test by getting user info
-    const response = await fetch(`${CARTONCLOUD_API_BASE}/uaa/userinfo`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept-Version': '1',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`User info request failed: ${response.status}`);
-    }
-
-    const userInfo = await response.json();
-    console.log('Connection test successful, user:', userInfo.name);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     
-    return {
-      success: true,
-      message: `Connected successfully as ${userInfo.name}`,
-      userInfo,
-    };
+    try {
+      const response = await fetch(`${CARTONCLOUD_API_BASE}/uaa/userinfo`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept-Version': '1',
+        },
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`User info request failed: ${response.status}`);
+      }
+
+      const userInfo = await response.json();
+      console.log('Connection test successful, user:', userInfo.name);
+      
+      return {
+        success: true,
+        message: `Connected successfully as ${userInfo.name}`,
+        userInfo,
+      };
+    } finally {
+      clearTimeout(timeoutId);
+    }
   } catch (error) {
-    console.error('Connection test failed:', error);
+    console.error('Connection test failed:', error instanceof Error ? error.message : 'Unknown error');
     return {
       success: false,
       message: error instanceof Error ? error.message : 'Connection failed',
@@ -224,16 +279,14 @@ async function testConnection(
 async function validateUserAuthorization(
   supabaseClient: any, 
   userId: string, 
-  userTenantId: string | null
 ): Promise<{ authorized: boolean; error?: string }> {
-  // Check if user has admin or super_user role
   const { data: roles, error: rolesError } = await supabaseClient
     .from('user_roles')
     .select('role')
     .eq('user_id', userId);
 
   if (rolesError) {
-    console.error('Error fetching user roles:', rolesError);
+    console.error('Error fetching user roles:', rolesError.message);
     return { authorized: false, error: 'Failed to verify user permissions' };
   }
 
@@ -249,13 +302,24 @@ async function validateUserAuthorization(
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Rate limiting by IP
+  const clientIP = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (isRateLimited(`cartoncloud:${clientIP}`)) {
+    console.warn(`[RATE_LIMIT] IP ${clientIP} exceeded rate limit for cartoncloud`);
+    return new Response(JSON.stringify({ error: "Too many requests. Please try again later." }), {
+      status: 429,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
-    // Extract and validate JWT from request
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       console.error('No authorization header provided');
@@ -265,18 +329,16 @@ serve(async (req) => {
       );
     }
 
-    // Create client with user's auth context to leverage RLS
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    // Verify the user's JWT and get user info
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     
     if (authError || !user) {
-      console.error('Auth error:', authError);
+      console.error('Auth error:', authError?.message);
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -285,7 +347,6 @@ serve(async (req) => {
 
     console.log('Authenticated user:', user.id);
 
-    // Get user's tenant_id from profile
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select('tenant_id')
@@ -293,7 +354,7 @@ serve(async (req) => {
       .single();
 
     if (profileError) {
-      console.error('Error fetching profile:', profileError);
+      console.error('Error fetching profile:', profileError.message);
       return new Response(
         JSON.stringify({ error: 'Failed to fetch user profile' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -303,11 +364,9 @@ serve(async (req) => {
     const userTenantId = profile?.tenant_id;
     console.log('User tenant_id:', userTenantId);
 
-    // Validate user has admin or super_user role
     const { authorized, error: authzError } = await validateUserAuthorization(
       supabaseClient, 
-      user.id, 
-      userTenantId
+      user.id
     );
 
     if (!authorized) {
@@ -320,7 +379,6 @@ serve(async (req) => {
     const { action, searchTerm, clientId, clientSecret, tenantId } = await req.json();
     console.log('CartonCloud function called with action:', action);
 
-    // Input validation
     if (action && typeof action !== 'string') {
       return new Response(
         JSON.stringify({ error: 'Invalid action parameter' }),
@@ -337,7 +395,6 @@ serve(async (req) => {
         );
       }
 
-      // Validate credential formats
       if (typeof clientId !== 'string' || clientId.length > 500 ||
           typeof clientSecret !== 'string' || clientSecret.length > 500 ||
           typeof tenantId !== 'string' || tenantId.length > 100) {
@@ -366,7 +423,6 @@ serve(async (req) => {
 
     // Test saved connection (for existing credentials in database)
     if (action === 'test-saved-connection') {
-      // Fetch credentials from database using RLS
       let settingsQuery = supabaseClient
         .from('cartoncloud_settings')
         .select('*')
@@ -379,7 +435,7 @@ serve(async (req) => {
       const { data: savedSettings, error: savedSettingsError } = await settingsQuery.maybeSingle();
 
       if (savedSettingsError) {
-        console.error('Error fetching settings:', savedSettingsError);
+        console.error('Error fetching settings:', savedSettingsError.message);
         return new Response(
           JSON.stringify({ success: false, message: 'Failed to fetch CartonCloud settings' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -393,7 +449,6 @@ serve(async (req) => {
         );
       }
 
-      // Decrypt credentials
       let decClientId = savedSettings.client_id;
       let decClientSecret = savedSettings.client_secret;
 
@@ -402,7 +457,7 @@ serve(async (req) => {
           decClientId = await decrypt(savedSettings.client_id);
           decClientSecret = await decrypt(savedSettings.client_secret);
         } catch (decryptError) {
-          console.error('Failed to decrypt credentials:', decryptError);
+          console.error('Failed to decrypt credentials:', decryptError instanceof Error ? decryptError.message : 'Unknown');
           return new Response(
             JSON.stringify({ success: false, message: 'Failed to decrypt credentials. Please re-save your CartonCloud settings.' }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -426,13 +481,13 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    // RLS will ensure user can only access their tenant's settings
+
+    // Fetch settings for other actions
     let settingsQuery = supabaseClient
       .from('cartoncloud_settings')
       .select('*')
       .eq('is_active', true);
 
-    // Filter by user's tenant if they have one (super_users can see all via RLS)
     if (userTenantId) {
       settingsQuery = settingsQuery.eq('tenant_id', userTenantId);
     }
@@ -440,7 +495,7 @@ serve(async (req) => {
     const { data: settings, error: settingsError } = await settingsQuery.maybeSingle();
 
     if (settingsError) {
-      console.error('Error fetching settings:', settingsError);
+      console.error('Error fetching settings:', settingsError.message);
       return new Response(
         JSON.stringify({ error: 'Failed to fetch CartonCloud settings' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -454,14 +509,12 @@ serve(async (req) => {
       );
     }
 
-    // Audit log: credentials being accessed server-side
     logAudit('CARTONCLOUD_CREDENTIALS_ACCESS', user.id, userTenantId, {
       action,
       settingsId: settings.id,
       cartoncloudTenantId: settings.cartoncloud_tenant_id,
     });
 
-    // Decrypt credentials if they are encrypted
     let decryptedClientId = settings.client_id;
     let decryptedClientSecret = settings.client_secret;
 
@@ -471,7 +524,7 @@ serve(async (req) => {
         decryptedClientId = await decrypt(settings.client_id);
         decryptedClientSecret = await decrypt(settings.client_secret);
       } catch (decryptError) {
-        console.error('Failed to decrypt credentials:', decryptError);
+        console.error('Failed to decrypt credentials:', decryptError instanceof Error ? decryptError.message : 'Unknown');
         return new Response(
           JSON.stringify({ error: 'Failed to decrypt credentials. Please re-save your CartonCloud settings.' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -493,7 +546,6 @@ serve(async (req) => {
         );
       }
 
-      // Validate searchTerm
       if (typeof searchTerm !== 'string' || searchTerm.length > 200) {
         return new Response(
           JSON.stringify({ error: 'Invalid search term' }),
@@ -501,32 +553,31 @@ serve(async (req) => {
         );
       }
 
-      const results = await searchInboundOrders(accessToken, settings.cartoncloud_tenant_id, searchTerm);
+      const orders = await searchInboundOrders(accessToken, settings.cartoncloud_tenant_id, searchTerm);
       
-      // Transform results to a simpler format
-      const transformedResults = results.map((order: any) => ({
+      const formattedOrders = orders.map((order: any) => ({
         id: order.id,
-        reference: order.references?.customer || order.references?.numericId || 'N/A',
-        customer: order.customer?.name || 'Unknown',
-        status: order.status || 'Unknown',
-        arrivalDate: order.details?.arrivalDate || null,
-        itemCount: order.items?.length || 0,
-        warehouseName: order.warehouse?.name || 'Default',
+        reference: order.reference || 'N/A',
+        customerName: order.customerName || 'Unknown Customer',
+        status: order.status || 'unknown',
+        createdAt: order.createdAt,
+        expectedDeliveryDate: order.expectedDeliveryDate,
+        items: order.items || [],
       }));
 
-      return new Response(JSON.stringify({ orders: transformedResults }), {
+      return new Response(JSON.stringify({ orders: formattedOrders }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     return new Response(
-      JSON.stringify({ error: 'Unknown action' }),
+      JSON.stringify({ error: 'Invalid action' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error in cartoncloud function:', error);
+    console.error('Error in cartoncloud function:', error instanceof Error ? error.message : 'Unknown error');
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'An error occurred' }),
+      JSON.stringify({ error: 'An error occurred processing your request' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
