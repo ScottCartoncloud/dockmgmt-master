@@ -38,6 +38,7 @@ export interface CrossDockBooking {
   carrier: string;
   truckRego?: string;
   dockNumber?: number;
+  dockDoorId?: string;
   purchaseOrderId?: string;
   purchaseOrder?: PurchaseOrder;
   cartonCloudPO?: CartonCloudPO;
