@@ -67,7 +67,7 @@ export function BookingModal({
   const [endTime, setEndTime] = useState('10:00');
   const [carrier, setCarrier] = useState('');
   const [truckRego, setTruckRego] = useState('');
-  const [dockNumber, setDockNumber] = useState<string>('');
+  const [selectedDockId, setSelectedDockId] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState<CrossDockBooking['status']>('scheduled');
   const [selectedPO, setSelectedPO] = useState<CartonCloudPO | null>(null);
@@ -112,7 +112,8 @@ export function BookingModal({
       setEndTime(booking.endTime);
       setCarrier(booking.carrier);
       setTruckRego(booking.truckRego || '');
-      setDockNumber(booking.dockNumber?.toString() || '');
+      // Find dock ID from booking's dock_door_id
+      setSelectedDockId(booking.dockDoorId || '');
       setNotes(booking.notes || '');
       setStatus(booking.status);
       setSelectedPO(booking.cartonCloudPO || null);
@@ -125,7 +126,12 @@ export function BookingModal({
       setEndTime(defaultHour ? `${(defaultHour + 1).toString().padStart(2, '0')}:00` : '10:00');
       setCarrier('');
       setTruckRego('');
-      setDockNumber(defaultDockNumber?.toString() || '');
+      // Find dock ID from defaultDockNumber
+      const defaultDock = defaultDockNumber ? activeDocks.find(d => {
+        const num = parseInt(d.name.replace(/\D/g, ''), 10);
+        return num === defaultDockNumber;
+      }) : null;
+      setSelectedDockId(defaultDock?.id || '');
       setNotes('');
       setStatus('scheduled');
       setSelectedPO(null);
@@ -133,7 +139,7 @@ export function BookingModal({
     }
     setSearchTerm('');
     setSearchResults([]);
-  }, [booking, defaultDate, defaultHour, defaultDockNumber, open]);
+  }, [booking, defaultDate, defaultHour, defaultDockNumber, open, activeDocks]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,6 +159,10 @@ export function BookingModal({
       return;
     }
     
+    // Get dock number from selected dock for display purposes
+    const selectedDock = activeDocks.find(d => d.id === selectedDockId);
+    const dockNumber = selectedDock ? parseInt(selectedDock.name.replace(/\D/g, ''), 10) || undefined : undefined;
+    
     onSave({
       id: booking?.id,
       title: title || (selectedPO ? `${selectedPO.customer} Delivery` : 'New Booking'),
@@ -161,7 +171,8 @@ export function BookingModal({
       endTime,
       carrier,
       truckRego: truckRego || undefined,
-      dockNumber: dockNumber ? parseInt(dockNumber) : undefined,
+      dockNumber,
+      dockDoorId: selectedDockId || undefined,
       purchaseOrderId: selectedPO?.id,
       cartonCloudPO: selectedPO || undefined,
       notes: notes || undefined,
@@ -385,25 +396,32 @@ export function BookingModal({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Dock</Label>
-              <Select value={dockNumber} onValueChange={setDockNumber}>
+              <Select value={selectedDockId} onValueChange={setSelectedDockId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select dock" />
+                  <SelectValue placeholder="Select dock">
+                    {selectedDockId && activeDocks.find(d => d.id === selectedDockId) && (
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: activeDocks.find(d => d.id === selectedDockId)?.color }}
+                        />
+                        {activeDocks.find(d => d.id === selectedDockId)?.name}
+                      </div>
+                    )}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {activeDocks.map((dock) => {
-                    const dockNum = parseInt(dock.name.replace(/\D/g, ''), 10);
-                    return (
-                      <SelectItem key={dock.id} value={dockNum.toString()}>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-2.5 h-2.5 rounded-full"
-                            style={{ backgroundColor: dock.color }}
-                          />
-                          {dock.name}
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
+                  {activeDocks.map((dock) => (
+                    <SelectItem key={dock.id} value={dock.id}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: dock.color }}
+                        />
+                        {dock.name}
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -45,6 +45,7 @@ const rowToBooking = (row: {
     carrier: row.carrier || '',
     truckRego: row.truck_rego || undefined,
     dockNumber,
+    dockDoorId: row.dock_door_id || undefined,
     purchaseOrderId: row.purchase_order_id || undefined,
     purchaseOrder: row.purchase_order as unknown as PurchaseOrder | undefined,
     cartonCloudPO: row.cartoncloud_po as unknown as CartonCloudPO | undefined,
