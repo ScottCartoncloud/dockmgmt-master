@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { CrossDockBooking, CartonCloudPO, CustomFieldValues } from '@/types/booking';
 import { format } from 'date-fns';
 import { X, Search, Package, ExternalLink, Trash2, Loader2 } from 'lucide-react';
@@ -81,7 +81,7 @@ export function BookingModal({
   const { data: customFields } = useActiveCustomBookingFields();
   const searchOrders = useSearchCartonCloudOrders();
   const isCartonCloudConnected = !!cartonCloudSettings;
-  const activeDocks = dockDoors?.filter(d => d.is_active) || [];
+  const activeDocks = useMemo(() => (dockDoors || []).filter((d) => d.is_active), [dockDoors]);
 
   const isEditing = !!booking;
 
@@ -102,7 +102,7 @@ export function BookingModal({
 
   useEffect(() => {
     debouncedSearch(searchTerm);
-  }, [searchTerm]);
+  }, [searchTerm, debouncedSearch]);
 
   useEffect(() => {
     if (booking) {
