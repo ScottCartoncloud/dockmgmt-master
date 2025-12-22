@@ -3,9 +3,10 @@ import { DockConfiguration } from '@/components/settings/DockConfiguration';
 import { CartonCloudIntegration } from '@/components/settings/CartonCloudIntegration';
 import { CardConfiguration } from '@/components/settings/CardConfiguration';
 import { UserManagement } from '@/components/settings/UserManagement';
+import { CarrierManagement } from '@/components/settings/CarrierManagement';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DoorOpen, Link2, Users, Clock, LayoutGrid } from 'lucide-react';
+import { DoorOpen, Link2, Users, Clock, LayoutGrid, Truck } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -20,6 +21,8 @@ const Settings = () => {
     setSearchParams({ tab: value });
   };
 
+  // Calculate number of tabs for grid columns
+  const tabCount = canAccessIntegration ? 6 : 5;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -32,7 +35,7 @@ const Settings = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className={`grid w-full lg:w-auto lg:inline-grid ${canAccessIntegration ? 'grid-cols-5' : 'grid-cols-4'}`}>
+          <TabsList className={`grid w-full lg:w-auto lg:inline-grid grid-cols-${tabCount}`}>
             <TabsTrigger value="docks" className="gap-2">
               <DoorOpen className="w-4 h-4" />
               <span className="hidden sm:inline">Docks</span>
@@ -40,6 +43,10 @@ const Settings = () => {
             <TabsTrigger value="cards" className="gap-2">
               <LayoutGrid className="w-4 h-4" />
               <span className="hidden sm:inline">Cards</span>
+            </TabsTrigger>
+            <TabsTrigger value="carriers" className="gap-2">
+              <Truck className="w-4 h-4" />
+              <span className="hidden sm:inline">Carriers</span>
             </TabsTrigger>
             {canAccessIntegration && (
               <TabsTrigger value="integration" className="gap-2">
@@ -69,6 +76,14 @@ const Settings = () => {
             <Card>
               <CardContent className="pt-6">
                 <CardConfiguration />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="carriers">
+            <Card>
+              <CardContent className="pt-6">
+                <CarrierManagement />
               </CardContent>
             </Card>
           </TabsContent>
