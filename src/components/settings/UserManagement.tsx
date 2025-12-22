@@ -59,7 +59,7 @@ const roleBadgeVariants: Record<AppRole, 'default' | 'secondary' | 'outline'> = 
 
 export function UserManagement() {
   const queryClient = useQueryClient();
-  const { isAdmin, isSuperUser } = useAuth();
+  const { isAdmin, isSuperUser, user: currentUser } = useAuth();
   const { activeTenant, isLoading: isTenantLoading } = useTenantContext();
   const canManageUsers = isAdmin || isSuperUser;
 
@@ -147,6 +147,7 @@ export function UserManagement() {
           inviteToken: invite.id,
           tenantId: activeTenant.id,
           role: roleLabels[role],
+          invitedByName: currentUser?.user_metadata?.full_name || currentUser?.email || undefined,
         },
       });
 
@@ -154,7 +155,22 @@ export function UserManagement() {
 
       if (emailError) {
         console.error('Failed to send invite email:', emailError);
-        // Don't throw - invite was created, email sending is secondary
+        // Show warning but don't throw - invite was created, user can resend
+        toast({
+          title: 'Invite Created',
+          description: 'The invitation was created but the email could not be sent. You can try resending it.',
+          variant: 'destructive',
+        });
+      }
+
+      // Check if response indicates failure
+      if (emailData?.error) {
+        console.error('Email sending failed:', emailData.error);
+        toast({
+          title: 'Email Not Sent',
+          description: emailData.error || 'The invitation email could not be sent.',
+          variant: 'destructive',
+        });
       }
     },
     onSuccess: () => {
