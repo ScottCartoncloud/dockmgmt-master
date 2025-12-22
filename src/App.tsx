@@ -30,6 +30,7 @@ const App = () => (
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/carrier/:bookingLinkId" element={<CarrierBooking />} />
+              <Route path="/carrier/:bookingLinkId/confirmed" element={<CarrierBookingConfirmed />} />
               <Route path="/" element={
                 <ProtectedRoute>
                   <Index />
