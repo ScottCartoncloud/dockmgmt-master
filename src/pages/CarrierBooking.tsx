@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ReCaptcha } from '@/components/ReCaptcha';
 import { 
   Loader2, 
   Calendar as CalendarIcon, 
@@ -22,6 +23,7 @@ import {
   Truck
 } from 'lucide-react';
 import cartonCloudLogo from '@/assets/cartoncloud-logo.png';
+
 
 interface CarrierInfo {
   id: string;
@@ -87,46 +89,59 @@ export default function CarrierBooking() {
   const [truckRego, setTruckRego] = useState('');
   const [notes, setNotes] = useState('');
   const [confirmationEmail, setConfirmationEmail] = useState('');
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const [recaptchaSiteKey, setRecaptchaSiteKey] = useState<string>('');
 
-  // Fetch carrier info
+  // Fetch carrier info and reCAPTCHA config
   useEffect(() => {
-    const fetchCarrier = async () => {
+    const fetchData = async () => {
       if (!bookingLinkId) {
         setError('Invalid booking link');
         setIsLoading(false);
         return;
       }
 
-      const { data, error } = await supabase
-        .from('carriers')
-        .select('id, name, tenant_id, is_booking_link_enabled')
-        .eq('booking_link_id', bookingLinkId)
-        .maybeSingle();
+      // Fetch carrier and reCAPTCHA config in parallel
+      const [carrierResult, recaptchaResult] = await Promise.all([
+        supabase
+          .from('carriers')
+          .select('id, name, tenant_id, is_booking_link_enabled')
+          .eq('booking_link_id', bookingLinkId)
+          .maybeSingle(),
+        supabase.functions.invoke('recaptcha-config'),
+      ]);
 
-      if (error) {
-        console.error('Error fetching carrier:', error);
+      // Handle carrier
+      if (carrierResult.error) {
+        console.error('Error fetching carrier:', carrierResult.error);
         setError('Unable to load booking page');
         setIsLoading(false);
         return;
       }
 
-      if (!data) {
+      if (!carrierResult.data) {
         setError('This booking link is invalid or has expired');
         setIsLoading(false);
         return;
       }
 
-      if (!data.is_booking_link_enabled) {
+      if (!carrierResult.data.is_booking_link_enabled) {
         setError('This booking link has been disabled. Please contact the carrier.');
         setIsLoading(false);
         return;
       }
 
-      setCarrier(data);
+      setCarrier(carrierResult.data);
+
+      // Handle reCAPTCHA config
+      if (recaptchaResult.data?.siteKey) {
+        setRecaptchaSiteKey(recaptchaResult.data.siteKey);
+      }
+
       setIsLoading(false);
     };
 
-    fetchCarrier();
+    fetchData();
   }, [bookingLinkId]);
 
   // Fetch booked slots when date changes
@@ -181,6 +196,11 @@ export default function CarrierBooking() {
       return;
     }
 
+    if (!recaptchaToken) {
+      setError('Please complete the reCAPTCHA verification');
+      return;
+    }
+
     const validation = bookingSchema.safeParse({
       title,
       pallets: pallets ? parseInt(pallets, 10) : undefined,
@@ -196,28 +216,29 @@ export default function CarrierBooking() {
 
     setIsSubmitting(true);
 
-    const { error: insertError } = await supabase
-      .from('bookings')
-      .insert({
-        tenant_id: carrier.tenant_id,
-        carrier_id: carrier.id,
+    // Use edge function with reCAPTCHA verification
+    const { data, error: submitError } = await supabase.functions.invoke('carrier-booking', {
+      body: {
+        recaptchaToken,
+        tenantId: carrier.tenant_id,
+        carrierId: carrier.id,
         title,
         date: format(selectedDate, 'yyyy-MM-dd'),
-        start_time: selectedSlot.start,
-        end_time: selectedSlot.end,
-        pallets: pallets ? parseInt(pallets, 10) : null,
-        truck_rego: truckRego || null,
-        notes: notes || null,
-        confirmation_email: confirmationEmail,
-        status: 'scheduled',
-        dock_door_id: null,
-      });
+        startTime: selectedSlot.start,
+        endTime: selectedSlot.end,
+        pallets: pallets ? parseInt(pallets, 10) : undefined,
+        truckRego: truckRego || undefined,
+        notes: notes || undefined,
+        confirmationEmail,
+      },
+    });
 
     setIsSubmitting(false);
 
-    if (insertError) {
-      console.error('Error creating booking:', insertError);
-      setError('Unable to create booking. Please try again.');
+    if (submitError || !data?.success) {
+      console.error('Error creating booking:', submitError || data?.error);
+      setError(data?.error || 'Unable to create booking. Please try again.');
+      setRecaptchaToken(null); // Reset reCAPTCHA on error
       return;
     }
 
@@ -452,7 +473,23 @@ export default function CarrierBooking() {
                 </p>
               </div>
 
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {/* reCAPTCHA */}
+              {recaptchaSiteKey && (
+                <div className="space-y-2">
+                  <ReCaptcha
+                    siteKey={recaptchaSiteKey}
+                    onVerify={(token) => setRecaptchaToken(token)}
+                    onExpire={() => setRecaptchaToken(null)}
+                    onError={() => setRecaptchaToken(null)}
+                  />
+                </div>
+              )}
+
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={isSubmitting || (recaptchaSiteKey && !recaptchaToken)}
+              >
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Confirm Booking
               </Button>

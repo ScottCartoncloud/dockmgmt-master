@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.send-invite-email]
 verify_jwt = false
+
+[functions.carrier-booking]
+verify_jwt = false
+
+[functions.recaptcha-config]
+verify_jwt = false
