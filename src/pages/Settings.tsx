@@ -32,30 +32,30 @@ const Settings = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="h-auto inline-flex flex-row items-center p-1">
-            <TabsTrigger value="docks" className="gap-2 flex-shrink-0">
+          <TabsList>
+            <TabsTrigger value="docks" className="gap-2">
               <DoorOpen className="w-4 h-4" />
               <span className="hidden sm:inline">Docks</span>
             </TabsTrigger>
-            <TabsTrigger value="cards" className="gap-2 flex-shrink-0">
+            <TabsTrigger value="cards" className="gap-2">
               <LayoutGrid className="w-4 h-4" />
               <span className="hidden sm:inline">Cards</span>
             </TabsTrigger>
-            <TabsTrigger value="carriers" className="gap-2 flex-shrink-0">
+            <TabsTrigger value="carriers" className="gap-2">
               <Truck className="w-4 h-4" />
               <span className="hidden sm:inline">Carriers</span>
             </TabsTrigger>
             {canAccessIntegration && (
-              <TabsTrigger value="integration" className="gap-2 flex-shrink-0">
+              <TabsTrigger value="integration" className="gap-2">
                 <Link2 className="w-4 h-4" />
                 <span className="hidden sm:inline">Integration</span>
               </TabsTrigger>
             )}
-            <TabsTrigger value="users" className="gap-2 flex-shrink-0">
+            <TabsTrigger value="users" className="gap-2">
               <Users className="w-4 h-4" />
               <span className="hidden sm:inline">Users</span>
             </TabsTrigger>
-            <TabsTrigger value="defaults" className="gap-2 flex-shrink-0">
+            <TabsTrigger value="defaults" className="gap-2">
               <Clock className="w-4 h-4" />
               <span className="hidden sm:inline">Defaults</span>
             </TabsTrigger>
