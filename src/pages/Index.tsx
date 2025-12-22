@@ -117,24 +117,20 @@ const Index = () => {
     }
   };
 
-  const handleBookingMove = async (booking: CrossDockBooking, newDate: Date, dropHour: number, offsetMinutes: number, newDockId?: string) => {
+  const handleBookingMove = async (booking: CrossDockBooking, newDate: Date, dropHour: number, _offsetMinutes: number, newDockId?: string) => {
     // Calculate the duration of the booking in minutes
     const [startH, startM] = booking.startTime.split(':').map(Number);
     const [endH, endM] = booking.endTime.split(':').map(Number);
     const durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
     
-    // Calculate the new start time by subtracting the click offset from the drop position
-    const dropMinutes = dropHour * 60;
-    const newStartMinutes = Math.max(0, dropMinutes - offsetMinutes);
+    // dropHour is already snapped and offset-adjusted from the view components
+    const newStartMinutes = Math.round(dropHour * 60);
     
-    // Snap to 15-minute intervals
-    const snappedStartMinutes = Math.round(newStartMinutes / 15) * 15;
+    // Calculate end time preserving original duration
+    const newEndMinutes = Math.min(23 * 60 + 59, newStartMinutes + durationMinutes);
     
-    // Calculate end time
-    const newEndMinutes = Math.min(23 * 60 + 59, snappedStartMinutes + durationMinutes);
-    
-    const newStartHour = Math.floor(snappedStartMinutes / 60);
-    const newStartMin = snappedStartMinutes % 60;
+    const newStartHour = Math.floor(newStartMinutes / 60);
+    const newStartMin = newStartMinutes % 60;
     const newEndHour = Math.floor(newEndMinutes / 60);
     const newEndMin = newEndMinutes % 60;
     

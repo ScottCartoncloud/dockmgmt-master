@@ -17,7 +17,6 @@ interface DraggableBookingCardProps {
   onDragEnd?: () => void;
   onResize?: (booking: CrossDockBooking, newEndTime: string) => void;
   compact?: boolean;
-  isDragging?: boolean;
   dockColor?: string;
   showDockBadge?: boolean;
 }
@@ -55,7 +54,6 @@ export function DraggableBookingCard({
   onDragEnd,
   onResize,
   compact = false,
-  isDragging = false,
   dockColor,
   showDockBadge = true,
 }: DraggableBookingCardProps) {
@@ -160,11 +158,10 @@ export function DraggableBookingCard({
         }
       }}
       className={cn(
-        'rounded-md p-2 border-l-4 cursor-grab transition-all duration-200 hover:shadow-card-hover relative group h-full overflow-hidden',
+        'rounded-md p-2 border-l-4 cursor-grab transition-shadow duration-200 hover:shadow-card-hover relative group h-full overflow-hidden',
         statusBorderColors[booking.status],
         bgClass,
         compact ? 'text-xs' : 'text-sm',
-        isDragging && 'opacity-50 shadow-lg',
         isResizing && 'cursor-ns-resize'
       )}
       style={bgStyle}
