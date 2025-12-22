@@ -3,15 +3,21 @@ import { HOURS } from '@/lib/calendarConstants';
 import { DraggableBookingCard } from './DraggableBookingCard';
 import { format, isSameDay } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useState, useRef, DragEvent, useMemo } from 'react';
+import { useRef, DragEvent, useMemo, useCallback } from 'react';
 import { useDockDoors, DockDoor } from '@/hooks/useDockDoors';
 import { Loader2 } from 'lucide-react';
 import { calculateBookingLayout, getBookingLayoutStyle } from '@/lib/bookingLayout';
+import {
+  HOUR_HEIGHT,
+  calculateDropMinutes,
+  getBookingHeight,
+  getBookingPositionStyle,
+  extractDragData,
+  formatTime,
+} from '@/hooks/useDragAndDrop';
 
-const HOUR_HEIGHT = 80; // pixels per hour
-const QUARTER_HEIGHT = HOUR_HEIGHT / 4; // 20px per 15 minutes
-const START_HOUR = HOURS[0]?.hour || 6; // Calendar starts at this hour
-const MIN_DOCK_WIDTH = 180; // minimum width per dock column
+const START_HOUR = HOURS[0]?.hour || 6;
+const MIN_DOCK_WIDTH = 180;
 
 interface DayViewProps {
   date: Date;
@@ -20,13 +26,6 @@ interface DayViewProps {
   onBookingClick: (booking: CrossDockBooking) => void;
   onBookingMove?: (booking: CrossDockBooking, newDate: Date, newHour: number, offsetMinutes: number, newDockId?: string) => void;
   onBookingResize?: (booking: CrossDockBooking, newEndTime: string) => void;
-}
-
-interface DragPreview {
-  topPosition: number;
-  height: number;
-  booking: CrossDockBooking;
-  dockId: string | null;
 }
 
 export function DayView({ 
@@ -38,38 +37,27 @@ export function DayView({
   onBookingResize
 }: DayViewProps) {
   const { data: dockDoors, isLoading: isLoadingDocks } = useDockDoors();
-  const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
-  const [draggingBooking, setDraggingBooking] = useState<CrossDockBooking | null>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
-  const offsetMinutesRef = useRef<number>(0);
   
-  const activeDocks = dockDoors?.filter(d => d.is_active) || [];
-  const dayBookings = bookings.filter((b) => isSameDay(b.date, date));
+  // Use refs to avoid re-renders during drag
+  const gridRef = useRef<HTMLDivElement>(null);
+  const previewRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const dragStateRef = useRef<{ booking: CrossDockBooking | null; offsetMinutes: number; activeDockId: string | null }>({
+    booking: null,
+    offsetMinutes: 0,
+    activeDockId: null,
+  });
+  const rafIdRef = useRef<number | null>(null);
+  const lastDropDataRef = useRef<{ snappedMinutes: number; dockId: string | null } | null>(null);
+  
+  const activeDocks = useMemo(() => dockDoors?.filter(d => d.is_active) || [], [dockDoors]);
+  const dayBookings = useMemo(() => bookings.filter((b) => isSameDay(b.date, date)), [bookings, date]);
 
-  const isCurrentHour = (hour: number) => {
+  const isCurrentHour = useCallback((hour: number) => {
     const now = new Date();
     return isSameDay(date, now) && now.getHours() === hour;
-  };
+  }, [date]);
 
-  // Get dock by ID or number
-  const getDockForBooking = (booking: CrossDockBooking): DockDoor | null => {
-    if (booking.dockNumber) {
-      // Try to match by dock number (legacy support)
-      const dock = activeDocks.find(d => d.name.includes(booking.dockNumber!.toString()));
-      if (dock) return dock;
-    }
-    return null;
-  };
-
-  // Calculate booking duration in pixels
-  const getBookingDurationHeight = (booking: CrossDockBooking) => {
-    const [startH, startM] = booking.startTime.split(':').map(Number);
-    const [endH, endM] = booking.endTime.split(':').map(Number);
-    const durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
-    return Math.max((durationMinutes / 60) * HOUR_HEIGHT, 32);
-  };
-
-  const getDockIdFromPosition = (clientX: number): string | null => {
+  const getDockIdFromPosition = useCallback((clientX: number): string | null => {
     if (!gridRef.current || activeDocks.length === 0) return null;
     
     const rect = gridRef.current.getBoundingClientRect();
@@ -81,108 +69,133 @@ export function DayView({
       return activeDocks[dockIndex].id;
     }
     return null;
-  };
+  }, [activeDocks]);
 
-  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+  const hideAllPreviews = useCallback(() => {
+    previewRefs.current.forEach((el) => {
+      el.style.display = 'none';
+    });
+  }, []);
+
+  const updatePreview = useCallback((dockId: string, top: number, height: number, title: string, color: string) => {
+    // Cancel any pending RAF
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+    }
+    
+    rafIdRef.current = requestAnimationFrame(() => {
+      // Hide all other previews
+      previewRefs.current.forEach((el, id) => {
+        if (id !== dockId) {
+          el.style.display = 'none';
+        }
+      });
+      
+      // Show and position the active preview
+      const previewEl = previewRefs.current.get(dockId);
+      if (previewEl) {
+        previewEl.style.display = 'block';
+        previewEl.style.top = `${top}px`;
+        previewEl.style.height = `${height}px`;
+        previewEl.style.borderColor = color;
+        previewEl.style.backgroundColor = `${color}20`;
+        
+        const textEl = previewEl.querySelector('[data-preview-text]') as HTMLElement;
+        if (textEl) {
+          textEl.textContent = title;
+          textEl.style.color = color;
+        }
+      }
+      
+      rafIdRef.current = null;
+    });
+  }, []);
+
+  const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     
-    if (!gridRef.current || !draggingBooking) return;
+    if (!gridRef.current || !dragStateRef.current.booking) return;
     
     const rect = gridRef.current.getBoundingClientRect();
-    const yInGrid = e.clientY - rect.top;
-    
-    // Calculate drop position accounting for click offset
-    const rawMinutes = (yInGrid / HOUR_HEIGHT) * 60 + (START_HOUR * 60);
-    const adjustedMinutes = rawMinutes - offsetMinutesRef.current;
-    
-    // Snap to 15-minute intervals
-    const snappedMinutes = Math.round(adjustedMinutes / 15) * 15;
-    const clampedMinutes = Math.max(START_HOUR * 60, Math.min(23 * 60 + 45, snappedMinutes));
-    
-    // Convert back to pixel position
-    const topPosition = ((clampedMinutes - START_HOUR * 60) / 60) * HOUR_HEIGHT;
-    const height = getBookingDurationHeight(draggingBooking);
-    
-    // Get which dock we're hovering over
     const dockId = getDockIdFromPosition(e.clientX);
+    const { snappedMinutes, topPosition } = calculateDropMinutes(
+      e.clientY,
+      rect.top,
+      START_HOUR,
+      dragStateRef.current.offsetMinutes
+    );
     
-    setDragPreview({
-      topPosition,
-      height,
-      booking: draggingBooking,
-      dockId,
-    });
-  };
-
-  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
-    // Only clear if leaving the grid entirely
-    if (!gridRef.current?.contains(e.relatedTarget as Node)) {
-      setDragPreview(null);
+    // Store last calculated drop data for use in handleDrop
+    lastDropDataRef.current = { snappedMinutes, dockId };
+    dragStateRef.current.activeDockId = dockId;
+    
+    const height = getBookingHeight(dragStateRef.current.booking);
+    const dock = activeDocks.find(d => d.id === dockId);
+    const color = dock?.color || 'hsl(var(--accent))';
+    
+    if (dockId) {
+      updatePreview(dockId, topPosition, height, dragStateRef.current.booking.title, color);
     }
-  };
+  }, [activeDocks, getDockIdFromPosition, updatePreview]);
 
-  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+  const handleDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
+    if (!gridRef.current?.contains(e.relatedTarget as Node)) {
+      hideAllPreviews();
+      dragStateRef.current.activeDockId = null;
+    }
+  }, [hideAllPreviews]);
+
+  const handleDrop = useCallback((e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     
-    const bookingData = e.dataTransfer.getData('bookingData');
-    const offsetMinutes = parseInt(e.dataTransfer.getData('offsetMinutes') || '0', 10);
-    
-    if (bookingData && onBookingMove && gridRef.current) {
-      const booking = JSON.parse(bookingData) as CrossDockBooking;
-      
-      const rect = gridRef.current.getBoundingClientRect();
-      const yInGrid = e.clientY - rect.top;
-      const rawMinutes = (yInGrid / HOUR_HEIGHT) * 60 + (START_HOUR * 60);
-      const adjustedMinutes = rawMinutes - offsetMinutes;
-      const snappedMinutes = Math.round(adjustedMinutes / 15) * 15;
-      
-      const preciseDropHour = snappedMinutes / 60;
-      const dockId = getDockIdFromPosition(e.clientX);
-      
-      onBookingMove(booking, date, preciseDropHour, 0, dockId || undefined);
+    const dragData = extractDragData(e);
+    if (!dragData || !onBookingMove || !gridRef.current) {
+      hideAllPreviews();
+      return;
     }
     
-    setDragPreview(null);
-  };
-
-  const handleDragStart = (booking: CrossDockBooking, offsetMinutes: number) => {
-    setDraggingBooking(booking);
-    offsetMinutesRef.current = offsetMinutes;
-  };
-
-  const handleDragEnd = () => {
-    setDraggingBooking(null);
-    setDragPreview(null);
-    offsetMinutesRef.current = 0;
-  };
-
-  // Calculate booking position based on time
-  const getBookingStyle = (booking: CrossDockBooking) => {
-    const [startHour, startMin] = booking.startTime.split(':').map(Number);
-    const [endHour, endMin] = booking.endTime.split(':').map(Number);
+    const rect = gridRef.current.getBoundingClientRect();
+    const dockId = getDockIdFromPosition(e.clientX);
+    const { snappedMinutes } = calculateDropMinutes(
+      e.clientY,
+      rect.top,
+      START_HOUR,
+      dragData.offsetMinutes
+    );
     
-    const startOffset = ((startHour - START_HOUR) * HOUR_HEIGHT) + (startMin / 60 * HOUR_HEIGHT);
-    const endOffset = ((endHour - START_HOUR) * HOUR_HEIGHT) + (endMin / 60 * HOUR_HEIGHT);
-    const height = Math.max(endOffset - startOffset, 32);
+    // Convert snapped minutes to hour fraction for callback
+    const preciseDropHour = snappedMinutes / 60;
     
-    return {
-      top: Math.max(0, startOffset),
-      height,
-    };
-  };
+    onBookingMove(dragData.booking, date, preciseDropHour, 0, dockId || undefined);
+    hideAllPreviews();
+  }, [date, getDockIdFromPosition, hideAllPreviews, onBookingMove]);
+
+  const handleDragStart = useCallback((booking: CrossDockBooking, offsetMinutes: number) => {
+    dragStateRef.current = { booking, offsetMinutes, activeDockId: null };
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    dragStateRef.current = { booking: null, offsetMinutes: 0, activeDockId: null };
+    lastDropDataRef.current = null;
+    hideAllPreviews();
+    
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+  }, [hideAllPreviews]);
 
   // Group bookings by dock
-  const getBookingsForDock = (dock: DockDoor) => {
+  const getBookingsForDock = useCallback((dock: DockDoor) => {
     return dayBookings.filter(booking => {
-      // Match by dock number
       if (booking.dockNumber) {
         const dockNum = parseInt(dock.name.replace(/\D/g, ''), 10);
         return booking.dockNumber === dockNum || dock.name.includes(booking.dockNumber.toString());
       }
       return false;
     });
-  };
+  }, [dayBookings]);
 
   // Calculate layout for each dock's bookings
   const dockLayouts = useMemo(() => {
@@ -201,10 +214,10 @@ export function DayView({
     });
     
     return layouts;
-  }, [dayBookings, activeDocks]);
+  }, [dayBookings, activeDocks, getBookingsForDock]);
 
   // Bookings without an assigned dock
-  const unassignedBookings = dayBookings.filter(booking => !booking.dockNumber);
+  const unassignedBookings = useMemo(() => dayBookings.filter(booking => !booking.dockNumber), [dayBookings]);
 
   if (isLoadingDocks) {
     return (
@@ -299,7 +312,6 @@ export function DayView({
           >
             {activeDocks.map((dock, dockIndex) => {
               const dockBookings = getBookingsForDock(dock);
-              const dockNumber = parseInt(dock.name.replace(/\D/g, ''), 10) || dockIndex + 1;
               
               return (
                 <div
@@ -314,7 +326,7 @@ export function DayView({
                       className={cn(
                         'border-b border-border cursor-pointer transition-colors relative',
                         isCurrentHour(hour) && 'bg-accent/5',
-                        !dragPreview && 'hover:bg-muted/50'
+                        'hover:bg-muted/50'
                       )}
                       style={{ height: HOUR_HEIGHT }}
                       onClick={() => onTimeSlotClick(date, hour, dock.id)}
@@ -329,8 +341,7 @@ export function DayView({
                   {/* Bookings for this dock */}
                   <div className="absolute inset-0 pointer-events-none">
                     {dockBookings.map((booking) => {
-                      const style = getBookingStyle(booking);
-                      const isDragging = draggingBooking?.id === booking.id;
+                      const style = getBookingPositionStyle(booking, START_HOUR);
                       const layout = dockLayouts.get(dock.id)?.get(booking.id);
                       const layoutStyle = layout
                         ? getBookingLayoutStyle(layout.column, layout.totalColumns, 4)
@@ -339,10 +350,7 @@ export function DayView({
                       return (
                         <div
                           key={booking.id}
-                          className={cn(
-                            "absolute pointer-events-auto z-10",
-                            isDragging && "opacity-30"
-                          )}
+                          className="absolute pointer-events-auto z-10"
                           style={{
                             top: style.top,
                             height: style.height,
@@ -356,7 +364,6 @@ export function DayView({
                             onDragStart={handleDragStart}
                             onDragEnd={handleDragEnd}
                             onResize={onBookingResize}
-                            isDragging={isDragging}
                             dockColor={dock.color}
                             showDockBadge={false}
                           />
@@ -365,22 +372,17 @@ export function DayView({
                     })}
                   </div>
 
-                  {/* Drag preview for this dock */}
-                  {dragPreview && dragPreview.dockId === dock.id && (
-                    <div
-                      className="absolute left-1 right-1 pointer-events-none z-20 rounded-md border-2 border-dashed transition-all duration-75"
-                      style={{
-                        top: dragPreview.topPosition,
-                        height: dragPreview.height,
-                        borderColor: dock.color,
-                        backgroundColor: `${dock.color}20`,
-                      }}
-                    >
-                      <div className="p-2 text-sm font-medium truncate" style={{ color: dock.color }}>
-                        {dragPreview.booking.title}
-                      </div>
-                    </div>
-                  )}
+                  {/* Drag preview for this dock - managed via refs for performance */}
+                  <div
+                    ref={(el) => {
+                      if (el) previewRefs.current.set(dock.id, el);
+                      else previewRefs.current.delete(dock.id);
+                    }}
+                    className="absolute left-1 right-1 pointer-events-none z-20 rounded-md border-2 border-dashed hidden"
+                    style={{ display: 'none' }}
+                  >
+                    <div data-preview-text className="p-2 text-sm font-medium truncate" />
+                  </div>
                 </div>
               );
             })}

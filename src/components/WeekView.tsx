@@ -3,12 +3,18 @@ import { HOURS } from '@/lib/calendarConstants';
 import { DraggableBookingCard } from './DraggableBookingCard';
 import { format, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useState, useRef, DragEvent, useMemo } from 'react';
-import { useDockDoors, DockDoor } from '@/hooks/useDockDoors';
+import { useRef, DragEvent, useMemo, useCallback } from 'react';
+import { useDockDoors } from '@/hooks/useDockDoors';
 import { calculateBookingLayout, getBookingLayoutStyle } from '@/lib/bookingLayout';
+import {
+  HOUR_HEIGHT,
+  calculateDropMinutes,
+  getBookingHeight,
+  getBookingPositionStyle,
+  extractDragData,
+} from '@/hooks/useDragAndDrop';
 
-const HOUR_HEIGHT = 80; // pixels per hour
-const START_HOUR = HOURS[0]?.hour || 6; // Calendar starts at this hour
+const START_HOUR = HOURS[0]?.hour || 6;
 
 interface WeekViewProps {
   date: Date;
@@ -17,13 +23,6 @@ interface WeekViewProps {
   onBookingClick: (booking: CrossDockBooking) => void;
   onBookingMove?: (booking: CrossDockBooking, newDate: Date, newHour: number, offsetMinutes: number) => void;
   onBookingResize?: (booking: CrossDockBooking, newEndTime: string) => void;
-}
-
-interface DragPreview {
-  topPosition: number;
-  height: number;
-  dayIndex: number;
-  booking: CrossDockBooking;
 }
 
 export function WeekView({ 
@@ -35,28 +34,34 @@ export function WeekView({
   onBookingResize
 }: WeekViewProps) {
   const { data: dockDoors } = useDockDoors();
-  const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
-  const [draggingBooking, setDraggingBooking] = useState<CrossDockBooking | null>(null);
-  const gridRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const offsetMinutesRef = useRef<number>(0);
   
-  const activeDocks = dockDoors?.filter(d => d.is_active) || [];
-  const weekStart = startOfWeek(date, { weekStartsOn: 1 });
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  // Use refs for drag state to avoid re-renders
+  const gridRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const previewRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const dragStateRef = useRef<{ booking: CrossDockBooking | null; offsetMinutes: number; activeDayIndex: number | null }>({
+    booking: null,
+    offsetMinutes: 0,
+    activeDayIndex: null,
+  });
+  const rafIdRef = useRef<number | null>(null);
+  
+  const activeDocks = useMemo(() => dockDoors?.filter(d => d.is_active) || [], [dockDoors]);
+  const weekStart = useMemo(() => startOfWeek(date, { weekStartsOn: 1 }), [date]);
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
   // Get dock color for a booking based on its dock number
-  const getDockColorForBooking = (booking: CrossDockBooking): string | undefined => {
+  const getDockColorForBooking = useCallback((booking: CrossDockBooking): string | undefined => {
     if (!booking.dockNumber) return undefined;
     const dock = activeDocks.find(d => 
       d.name.includes(booking.dockNumber!.toString()) || 
       parseInt(d.name.replace(/\D/g, ''), 10) === booking.dockNumber
     );
     return dock?.color;
-  };
+  }, [activeDocks]);
 
-  const getBookingsForDay = (day: Date) => {
+  const getBookingsForDay = useCallback((day: Date) => {
     return bookings.filter((b) => isSameDay(b.date, day));
-  };
+  }, [bookings]);
 
   // Calculate layout for each day's bookings
   const dayLayouts = useMemo(() => {
@@ -76,52 +81,72 @@ export function WeekView({
     });
     
     return layouts;
-  }, [bookings, weekDays]);
+  }, [bookings, weekDays, getBookingsForDay]);
 
-  const isCurrentHour = (day: Date, hour: number) => {
+  const isCurrentHour = useCallback((day: Date, hour: number) => {
     const now = new Date();
     return isSameDay(day, now) && now.getHours() === hour;
-  };
+  }, []);
 
-  // Calculate booking duration in pixels
-  const getBookingDurationHeight = (booking: CrossDockBooking) => {
-    const [startH, startM] = booking.startTime.split(':').map(Number);
-    const [endH, endM] = booking.endTime.split(':').map(Number);
-    const durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
-    return Math.max((durationMinutes / 60) * HOUR_HEIGHT, 20);
-  };
+  const hideAllPreviews = useCallback(() => {
+    previewRefs.current.forEach((el) => {
+      if (el) el.style.display = 'none';
+    });
+  }, []);
 
-  const handleDragOver = (e: DragEvent<HTMLDivElement>, dayIndex: number) => {
+  const updatePreview = useCallback((dayIndex: number, top: number, height: number, title: string) => {
+    // Cancel any pending RAF
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+    }
+    
+    rafIdRef.current = requestAnimationFrame(() => {
+      // Hide all other previews
+      previewRefs.current.forEach((el, idx) => {
+        if (el && idx !== dayIndex) {
+          el.style.display = 'none';
+        }
+      });
+      
+      // Show and position the active preview
+      const previewEl = previewRefs.current[dayIndex];
+      if (previewEl) {
+        previewEl.style.display = 'block';
+        previewEl.style.top = `${top}px`;
+        previewEl.style.height = `${height}px`;
+        
+        const textEl = previewEl.querySelector('[data-preview-text]') as HTMLElement;
+        if (textEl) {
+          textEl.textContent = title;
+        }
+      }
+      
+      rafIdRef.current = null;
+    });
+  }, []);
+
+  const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>, dayIndex: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     
     const gridEl = gridRefs.current[dayIndex];
-    if (!gridEl || !draggingBooking) return;
+    if (!gridEl || !dragStateRef.current.booking) return;
     
     const rect = gridEl.getBoundingClientRect();
-    const yInGrid = e.clientY - rect.top;
+    const { topPosition } = calculateDropMinutes(
+      e.clientY,
+      rect.top,
+      START_HOUR,
+      dragStateRef.current.offsetMinutes
+    );
     
-    // Calculate drop position accounting for click offset
-    const rawMinutes = (yInGrid / HOUR_HEIGHT) * 60 + (START_HOUR * 60);
-    const adjustedMinutes = rawMinutes - offsetMinutesRef.current;
+    const height = getBookingHeight(dragStateRef.current.booking);
+    dragStateRef.current.activeDayIndex = dayIndex;
     
-    // Snap to 15-minute intervals
-    const snappedMinutes = Math.round(adjustedMinutes / 15) * 15;
-    const clampedMinutes = Math.max(START_HOUR * 60, Math.min(23 * 60 + 45, snappedMinutes));
-    
-    // Convert back to pixel position
-    const topPosition = ((clampedMinutes - START_HOUR * 60) / 60) * HOUR_HEIGHT;
-    const height = getBookingDurationHeight(draggingBooking);
-    
-    setDragPreview({
-      topPosition,
-      height,
-      dayIndex,
-      booking: draggingBooking,
-    });
-  };
+    updatePreview(dayIndex, topPosition, height, dragStateRef.current.booking.title);
+  }, [updatePreview]);
 
-  const handleDragLeave = (e: DragEvent<HTMLDivElement>, dayIndex: number) => {
+  const handleDragLeave = useCallback((e: DragEvent<HTMLDivElement>, dayIndex: number) => {
     const gridEl = gridRefs.current[dayIndex];
     if (!gridEl?.contains(e.relatedTarget as Node)) {
       // Check if moving to another day column
@@ -129,59 +154,50 @@ export function WeekView({
         idx !== dayIndex && ref?.contains(e.relatedTarget as Node)
       );
       if (!isMovingToAnotherDay) {
-        setDragPreview(null);
+        hideAllPreviews();
+        dragStateRef.current.activeDayIndex = null;
       }
     }
-  };
+  }, [hideAllPreviews]);
 
-  const handleDrop = (e: DragEvent<HTMLDivElement>, day: Date, dayIndex: number) => {
+  const handleDrop = useCallback((e: DragEvent<HTMLDivElement>, day: Date, dayIndex: number) => {
     e.preventDefault();
     
-    const bookingData = e.dataTransfer.getData('bookingData');
-    const offsetMinutes = parseInt(e.dataTransfer.getData('offsetMinutes') || '0', 10);
-    
+    const dragData = extractDragData(e);
     const gridEl = gridRefs.current[dayIndex];
-    if (bookingData && onBookingMove && gridEl) {
-      const booking = JSON.parse(bookingData) as CrossDockBooking;
-      
-      const rect = gridEl.getBoundingClientRect();
-      const yInGrid = e.clientY - rect.top;
-      const rawMinutes = (yInGrid / HOUR_HEIGHT) * 60 + (START_HOUR * 60);
-      const adjustedMinutes = rawMinutes - offsetMinutes;
-      const snappedMinutes = Math.round(adjustedMinutes / 15) * 15;
-      
-      const preciseDropHour = snappedMinutes / 60;
-      onBookingMove(booking, day, preciseDropHour, 0); // offset already applied
+    
+    if (!dragData || !onBookingMove || !gridEl) {
+      hideAllPreviews();
+      return;
     }
     
-    setDragPreview(null);
-  };
-
-  const handleDragStart = (booking: CrossDockBooking, offsetMinutes: number) => {
-    setDraggingBooking(booking);
-    offsetMinutesRef.current = offsetMinutes;
-  };
-
-  const handleDragEnd = () => {
-    setDraggingBooking(null);
-    setDragPreview(null);
-    offsetMinutesRef.current = 0;
-  };
-
-  // Calculate booking position and height based on time
-  const getBookingStyle = (booking: CrossDockBooking) => {
-    const [startHour, startMin] = booking.startTime.split(':').map(Number);
-    const [endHour, endMin] = booking.endTime.split(':').map(Number);
+    const rect = gridEl.getBoundingClientRect();
+    const { snappedMinutes } = calculateDropMinutes(
+      e.clientY,
+      rect.top,
+      START_HOUR,
+      dragData.offsetMinutes
+    );
     
-    const startOffset = ((startHour - START_HOUR) * HOUR_HEIGHT) + (startMin / 60 * HOUR_HEIGHT);
-    const endOffset = ((endHour - START_HOUR) * HOUR_HEIGHT) + (endMin / 60 * HOUR_HEIGHT);
-    const height = Math.max(endOffset - startOffset, 20);
+    const preciseDropHour = snappedMinutes / 60;
+    onBookingMove(dragData.booking, day, preciseDropHour, 0);
     
-    return {
-      top: Math.max(0, startOffset),
-      height,
-    };
-  };
+    hideAllPreviews();
+  }, [hideAllPreviews, onBookingMove]);
+
+  const handleDragStart = useCallback((booking: CrossDockBooking, offsetMinutes: number) => {
+    dragStateRef.current = { booking, offsetMinutes, activeDayIndex: null };
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    dragStateRef.current = { booking: null, offsetMinutes: 0, activeDayIndex: null };
+    hideAllPreviews();
+    
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+  }, [hideAllPreviews]);
 
   return (
     <div className="flex-1 overflow-auto">
@@ -255,7 +271,7 @@ export function WeekView({
                     className={cn(
                       'border-b border-border cursor-pointer transition-colors relative',
                       isCurrentHour(day, hour) && 'bg-accent/5',
-                      !dragPreview && 'hover:bg-muted/50'
+                      'hover:bg-muted/50'
                     )}
                     style={{ height: HOUR_HEIGHT }}
                     onClick={() => onTimeSlotClick(day, hour)}
@@ -267,26 +283,19 @@ export function WeekView({
                   </div>
                 ))}
 
-                {/* Drag preview ghost for this column */}
-                {dragPreview && dragPreview.dayIndex === dayIndex && (
-                  <div
-                    className="absolute left-0.5 right-0.5 pointer-events-none z-20 rounded-md border-2 border-dashed border-accent bg-accent/20 transition-all duration-75"
-                    style={{
-                      top: dragPreview.topPosition,
-                      height: dragPreview.height,
-                    }}
-                  >
-                    <div className="p-1 text-xs font-medium text-accent truncate">
-                      {dragPreview.booking.title}
-                    </div>
-                  </div>
-                )}
+                {/* Drag preview ghost for this column - managed via refs */}
+                <div
+                  ref={(el) => { previewRefs.current[dayIndex] = el; }}
+                  className="absolute left-0.5 right-0.5 pointer-events-none z-20 rounded-md border-2 border-dashed border-accent bg-accent/20 hidden"
+                  style={{ display: 'none' }}
+                >
+                  <div data-preview-text className="p-1 text-xs font-medium text-accent truncate" />
+                </div>
 
                 {/* Bookings overlay - positioned absolutely */}
                 <div className="absolute inset-0 pointer-events-none">
                   {dayBookings.map((booking) => {
-                    const style = getBookingStyle(booking);
-                    const isDragging = draggingBooking?.id === booking.id;
+                    const style = getBookingPositionStyle(booking, START_HOUR);
                     const layout = dayLayouts.get(day.toISOString())?.get(booking.id);
                     const layoutStyle = layout
                       ? getBookingLayoutStyle(layout.column, layout.totalColumns, 2)
@@ -295,10 +304,7 @@ export function WeekView({
                     return (
                       <div
                         key={booking.id}
-                        className={cn(
-                          "absolute pointer-events-auto z-10",
-                          isDragging && "opacity-30"
-                        )}
+                        className="absolute pointer-events-auto z-10"
                         style={{
                           top: style.top,
                           height: style.height,
@@ -313,7 +319,6 @@ export function WeekView({
                           onDragEnd={handleDragEnd}
                           onResize={onBookingResize}
                           compact
-                          isDragging={isDragging}
                           dockColor={getDockColorForBooking(booking)}
                         />
                       </div>
