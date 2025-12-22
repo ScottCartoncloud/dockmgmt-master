@@ -133,14 +133,6 @@ export function UserManagement() {
       if (error) throw error;
 
       // Send invite email via edge function
-      // Note: appUrl is NOT sent - the server uses APP_BASE_URL env var to prevent open redirects
-      console.log('Calling send-invite-email edge function with:', {
-        email,
-        inviteToken: invite.id,
-        tenantId: activeTenant.id,
-        role: roleLabels[role],
-      });
-
       const { data: emailData, error: emailError } = await supabase.functions.invoke('send-invite-email', {
         body: {
           email,
@@ -150,8 +142,6 @@ export function UserManagement() {
           invitedByName: currentUser?.user_metadata?.full_name || currentUser?.email || undefined,
         },
       });
-
-      console.log('Edge function response:', { emailData, emailError });
 
       if (emailError) {
         console.error('Failed to send invite email:', emailError);

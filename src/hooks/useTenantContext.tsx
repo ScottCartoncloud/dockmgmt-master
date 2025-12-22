@@ -3,6 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useQueryClient } from '@tanstack/react-query';
 
+// Only log in development mode
+const isDev = import.meta.env.DEV;
+
 interface Tenant {
   id: string;
   name: string;
@@ -32,11 +35,8 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   // Fetch tenants based on user role
   useEffect(() => {
     async function fetchTenants() {
-      console.log('[TenantContext] Fetching tenants, user:', user?.id, 'isSuperUser:', isSuperUser, 'devMode:', DEV_BYPASS_AUTH);
-      
       // In dev mode, fetch all tenants even without a user
       if (!user && !DEV_BYPASS_AUTH) {
-        console.log('[TenantContext] No user and not in dev mode, clearing tenants');
         setTenants([]);
         setActiveTenantState(null);
         setIsLoading(false);
@@ -47,20 +47,17 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       try {
         // In dev mode or as super user, fetch all tenants
         if (DEV_BYPASS_AUTH || isSuperUser) {
-          console.log('[TenantContext] Fetching all tenants (dev mode or super user)');
           const { data, error } = await supabase
             .from('tenants')
             .select('id, name')
             .order('name');
           
           if (error) {
-            console.error('[TenantContext] Error fetching tenants:', error);
+            if (isDev) console.error('[TenantContext] Error fetching tenants:', error.message);
             throw error;
           }
-          console.log('[TenantContext] Fetched tenants:', data);
           setTenants(data || []);
         } else if (profile?.tenant_id) {
-          console.log('[TenantContext] Regular user - fetching tenant:', profile.tenant_id);
           // Regular users can only see their own tenant
           const { data, error } = await supabase
             .from('tenants')
@@ -69,16 +66,15 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
             .single();
           
           if (error) {
-            console.error('[TenantContext] Error fetching tenant:', error);
+            if (isDev) console.error('[TenantContext] Error fetching tenant:', error.message);
             throw error;
           }
           setTenants(data ? [data] : []);
         } else {
-          console.log('[TenantContext] No tenant_id and not super user');
           setTenants([]);
         }
       } catch (error) {
-        console.error('[TenantContext] Error fetching tenants:', error);
+        // Only log actual errors, not expected states
         setTenants([]);
       } finally {
         setIsLoading(false);
