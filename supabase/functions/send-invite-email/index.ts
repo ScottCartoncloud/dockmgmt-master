@@ -12,24 +12,13 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const APP_BASE_URL = Deno.env.get("APP_BASE_URL");
 
-// CORS configuration - restrict to allowed origins
-const ALLOWED_ORIGINS = [
-  "http://localhost:5173",
-  "http://localhost:8080",
-  APP_BASE_URL,
-].filter(Boolean);
-
-function getCorsHeaders(origin: string | null): Record<string, string> {
-  const allowedOrigin = origin && ALLOWED_ORIGINS.some(allowed => 
-    origin === allowed || origin.endsWith('.lovableproject.com')
-  ) ? origin : ALLOWED_ORIGINS[0] || "*";
-  
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Credentials": "true",
-  };
-}
+// CORS headers (web-safe defaults)
+// NOTE: We do not use cookies/credentials for these requests, so "*" is safe here.
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
 // Simple in-memory rate limiter
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -76,9 +65,6 @@ function escapeHtml(str: string): string {
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  const origin = req.headers.get("origin");
-  const corsHeaders = getCorsHeaders(origin);
-  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
