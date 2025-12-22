@@ -1,5 +1,5 @@
 import { CrossDockBooking, CartonCloudPO } from '@/types/booking';
-import { Clock, Truck, Package, GripVertical } from 'lucide-react';
+import { Clock, Truck, Package, GripVertical, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useRef, DragEvent } from 'react';
 import {
@@ -204,6 +204,13 @@ export function DraggableBookingCard({
             <div className="flex items-center gap-1 mt-1 text-muted-foreground">
               <Truck className="w-3 h-3" />
               <span className="truncate">{booking.carrier}</span>
+            </div>
+          )}
+
+          {booking.pallets !== undefined && booking.pallets > 0 && (
+            <div className="flex items-center gap-1 mt-1 text-muted-foreground">
+              <Layers className="w-3 h-3" />
+              <span>{booking.pallets} pallet{booking.pallets !== 1 ? 's' : ''}</span>
             </div>
           )}
           

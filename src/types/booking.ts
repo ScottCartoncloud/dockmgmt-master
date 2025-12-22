@@ -37,6 +37,7 @@ export interface CrossDockBooking {
   endTime: string;
   carrier: string;
   truckRego?: string;
+  pallets?: number;
   dockNumber?: number;
   dockDoorId?: string;
   purchaseOrderId?: string;

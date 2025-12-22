@@ -15,6 +15,7 @@ const rowToBooking = (row: {
   end_time: string;
   carrier: string | null;
   truck_rego: string | null;
+  pallets: number | null;
   dock_door_id: string | null;
   purchase_order_id: string | null;
   purchase_order: Json | null;
@@ -44,6 +45,7 @@ const rowToBooking = (row: {
     endTime: row.end_time.slice(0, 5),
     carrier: row.carrier || '',
     truckRego: row.truck_rego || undefined,
+    pallets: row.pallets ?? undefined,
     dockNumber,
     dockDoorId: row.dock_door_id || undefined,
     purchaseOrderId: row.purchase_order_id || undefined,
@@ -133,6 +135,7 @@ export const useCreateBooking = () => {
           end_time: booking.endTime || '10:00',
           carrier: booking.carrier || null,
           truck_rego: booking.truckRego || null,
+          pallets: booking.pallets ?? null,
           dock_door_id: booking.dockDoorId || null,
           purchase_order_id: booking.purchaseOrderId || null,
           purchase_order: booking.purchaseOrder as unknown as Json || null,
@@ -170,6 +173,7 @@ export const useUpdateBooking = () => {
       if (booking.endTime !== undefined) updateData.end_time = booking.endTime;
       if (booking.carrier !== undefined) updateData.carrier = booking.carrier || null;
       if (booking.truckRego !== undefined) updateData.truck_rego = booking.truckRego || null;
+      if (booking.pallets !== undefined) updateData.pallets = booking.pallets ?? null;
       if (booking.dockDoorId !== undefined) updateData.dock_door_id = booking.dockDoorId || null;
       if (booking.purchaseOrderId !== undefined) updateData.purchase_order_id = booking.purchaseOrderId || null;
       if (booking.purchaseOrder !== undefined) updateData.purchase_order = booking.purchaseOrder || null;
