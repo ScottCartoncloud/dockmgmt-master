@@ -107,6 +107,10 @@ export function Header() {
               <LayoutGrid className="w-4 h-4" />
               Card Configuration
             </DropdownMenuItem>
+            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=carriers')}>
+              <Truck className="w-4 h-4" />
+              Carrier Management
+            </DropdownMenuItem>
             <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=integration')}>
               <Link2 className="w-4 h-4" />
               CartonCloud Integration
