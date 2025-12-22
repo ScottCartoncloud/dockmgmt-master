@@ -394,9 +394,50 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      cartoncloud_settings_safe: {
+        Row: {
+          cartoncloud_tenant_id: string | null
+          created_at: string | null
+          has_credentials: boolean | null
+          id: string | null
+          is_active: boolean | null
+          tenant_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cartoncloud_tenant_id?: string | null
+          created_at?: string | null
+          has_credentials?: never
+          id?: string | null
+          is_active?: boolean | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cartoncloud_tenant_id?: string | null
+          created_at?: string | null
+          has_credentials?: never
+          id?: string | null
+          is_active?: boolean | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cartoncloud_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      can_access_tenant_settings: {
+        Args: { _tenant_id: string }
+        Returns: boolean
+      }
       get_user_tenant_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
