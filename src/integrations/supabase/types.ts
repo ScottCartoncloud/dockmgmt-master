@@ -67,7 +67,9 @@ export type Database = {
       bookings: {
         Row: {
           carrier: string | null
+          carrier_id: string | null
           cartoncloud_po: Json | null
+          confirmation_email: string | null
           created_at: string
           created_by: string | null
           custom_fields: Json | null
@@ -88,7 +90,9 @@ export type Database = {
         }
         Insert: {
           carrier?: string | null
+          carrier_id?: string | null
           cartoncloud_po?: Json | null
+          confirmation_email?: string | null
           created_at?: string
           created_by?: string | null
           custom_fields?: Json | null
@@ -109,7 +113,9 @@ export type Database = {
         }
         Update: {
           carrier?: string | null
+          carrier_id?: string | null
           cartoncloud_po?: Json | null
+          confirmation_email?: string | null
           created_at?: string
           created_by?: string | null
           custom_fields?: Json | null
@@ -129,6 +135,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "bookings_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "bookings_dock_door_id_fkey"
             columns: ["dock_door_id"]

@@ -12,6 +12,8 @@ import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import EmailPreview from "./pages/EmailPreview";
+import CarrierBooking from "./pages/CarrierBooking";
+import CarrierBookingConfirmed from "./pages/CarrierBookingConfirmed";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +29,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/carrier/:bookingLinkId" element={<CarrierBooking />} />
               <Route path="/" element={
                 <ProtectedRoute>
                   <Index />
