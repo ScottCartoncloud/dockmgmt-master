@@ -62,6 +62,7 @@ export function BookingModal({
   defaultDockNumber,
 }: BookingModalProps) {
   const [title, setTitle] = useState('');
+  const [pallets, setPallets] = useState<string>('');
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('10:00');
@@ -107,6 +108,7 @@ export function BookingModal({
   useEffect(() => {
     if (booking) {
       setTitle(booking.title);
+      setPallets(booking.pallets?.toString() || '');
       setDate(format(booking.date, 'yyyy-MM-dd'));
       setStartTime(booking.startTime);
       setEndTime(booking.endTime);
@@ -121,6 +123,7 @@ export function BookingModal({
     } else {
       // Reset form for new booking
       setTitle('');
+      setPallets('');
       setDate(defaultDate ? format(defaultDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'));
       setStartTime(defaultHour ? `${defaultHour.toString().padStart(2, '0')}:00` : '09:00');
       setEndTime(defaultHour ? `${(defaultHour + 1).toString().padStart(2, '0')}:00` : '10:00');
@@ -163,6 +166,10 @@ export function BookingModal({
     const selectedDock = activeDocks.find(d => d.id === selectedDockId);
     const dockNumber = selectedDock ? parseInt(selectedDock.name.replace(/\D/g, ''), 10) || undefined : undefined;
     
+    // Parse pallets as integer (only valid if it's a whole number >= 0)
+    const palletsValue = pallets.trim() === '' ? undefined : parseInt(pallets, 10);
+    const validPallets = palletsValue !== undefined && !isNaN(palletsValue) && palletsValue >= 0 ? palletsValue : undefined;
+    
     onSave({
       id: booking?.id,
       title: title || (selectedPO ? `${selectedPO.customer} Delivery` : 'New Booking'),
@@ -171,6 +178,7 @@ export function BookingModal({
       endTime,
       carrier,
       truckRego: truckRego || undefined,
+      pallets: validPallets,
       dockNumber,
       dockDoorId: selectedDockId || undefined,
       purchaseOrderId: selectedPO?.id,
@@ -333,6 +341,26 @@ export function BookingModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Fresh Foods Delivery"
+            />
+          </div>
+
+          {/* Pallets */}
+          <div className="space-y-2">
+            <Label htmlFor="pallets"># of Pallets</Label>
+            <Input
+              id="pallets"
+              type="number"
+              min="0"
+              step="1"
+              value={pallets}
+              onChange={(e) => {
+                const value = e.target.value;
+                // Only allow whole numbers
+                if (value === '' || /^\d+$/.test(value)) {
+                  setPallets(value);
+                }
+              }}
+              placeholder="e.g., 12"
             />
           </div>
 

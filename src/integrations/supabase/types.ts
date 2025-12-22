@@ -76,6 +76,7 @@ export type Database = {
           end_time: string
           id: string
           notes: string | null
+          pallets: number | null
           purchase_order: Json | null
           purchase_order_id: string | null
           start_time: string
@@ -96,6 +97,7 @@ export type Database = {
           end_time: string
           id?: string
           notes?: string | null
+          pallets?: number | null
           purchase_order?: Json | null
           purchase_order_id?: string | null
           start_time: string
@@ -116,6 +118,7 @@ export type Database = {
           end_time?: string
           id?: string
           notes?: string | null
+          pallets?: number | null
           purchase_order?: Json | null
           purchase_order_id?: string | null
           start_time?: string
