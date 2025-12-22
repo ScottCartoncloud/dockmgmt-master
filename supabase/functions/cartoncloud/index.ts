@@ -329,6 +329,12 @@ serve(async (req) => {
       );
     }
 
+    // Use service role client for accessing encrypted credentials (base table is blocked from regular clients)
+    const supabaseServiceClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -423,7 +429,8 @@ serve(async (req) => {
 
     // Test saved connection (for existing credentials in database)
     if (action === 'test-saved-connection') {
-      let settingsQuery = supabaseClient
+      // Use service client to access encrypted credentials (base table blocked from regular clients)
+      let settingsQuery = supabaseServiceClient
         .from('cartoncloud_settings')
         .select('*')
         .eq('is_active', true);
@@ -482,8 +489,8 @@ serve(async (req) => {
       });
     }
 
-    // Fetch settings for other actions
-    let settingsQuery = supabaseClient
+    // Fetch settings for other actions (use service client to access encrypted credentials)
+    let settingsQuery = supabaseServiceClient
       .from('cartoncloud_settings')
       .select('*')
       .eq('is_active', true);

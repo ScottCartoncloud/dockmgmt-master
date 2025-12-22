@@ -21,10 +21,11 @@ export function useCartonCloudSettings() {
   return useQuery({
     queryKey: ['cartoncloud-settings', activeTenant?.id],
     queryFn: async () => {
-      // SECURITY: Only select non-sensitive columns - never client_id or client_secret
+      // SECURITY: Use the safe view which excludes sensitive credential columns
+      // The base table is blocked from all client access
       let query = supabase
-        .from('cartoncloud_settings')
-        .select('id, cartoncloud_tenant_id, tenant_id, is_active, created_at, updated_at');
+        .from('cartoncloud_settings_safe')
+        .select('id, cartoncloud_tenant_id, tenant_id, is_active, created_at, updated_at, has_credentials');
       
       if (activeTenant?.id) {
         query = query.eq('tenant_id', activeTenant.id);
@@ -36,11 +37,7 @@ export function useCartonCloudSettings() {
       
       if (!data) return null;
       
-      // Return with has_credentials flag (we know they exist if record exists)
-      return {
-        ...data,
-        has_credentials: true,
-      } as CartonCloudSettings;
+      return data as CartonCloudSettings;
     },
     enabled: !!activeTenant?.id,
   });

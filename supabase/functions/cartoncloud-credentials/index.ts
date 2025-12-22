@@ -160,6 +160,13 @@ serve(async (req) => {
       );
     }
 
+    // Use service role client for database operations (base table is blocked from regular clients)
+    const supabaseServiceClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+    
+    // Use user client only for auth
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -226,8 +233,8 @@ serve(async (req) => {
       const encryptedClientId = await encrypt(client_id);
       const encryptedClientSecret = await encrypt(client_secret);
 
-      // Check if settings exist for this tenant
-      const { data: existing } = await supabaseClient
+      // Check if settings exist for this tenant (use service client to bypass RLS)
+      const { data: existing } = await supabaseServiceClient
         .from('cartoncloud_settings')
         .select('id')
         .eq('tenant_id', userTenantId)
@@ -235,7 +242,7 @@ serve(async (req) => {
 
       let result;
       if (existing) {
-        const { data, error } = await supabaseClient
+        const { data, error } = await supabaseServiceClient
           .from('cartoncloud_settings')
           .update({
             client_id: encryptedClientId,
@@ -250,7 +257,7 @@ serve(async (req) => {
         if (error) throw error;
         result = data;
       } else {
-        const { data, error } = await supabaseClient
+        const { data, error } = await supabaseServiceClient
           .from('cartoncloud_settings')
           .insert({
             client_id: encryptedClientId,
@@ -289,7 +296,8 @@ serve(async (req) => {
         settings_id,
       });
 
-      const { error } = await supabaseClient
+      // Use service client to bypass RLS
+      const { error } = await supabaseServiceClient
         .from('cartoncloud_settings')
         .delete()
         .eq('id', settings_id);
