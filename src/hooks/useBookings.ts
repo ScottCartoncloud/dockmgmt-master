@@ -4,6 +4,13 @@ import { useTenantContext } from '@/hooks/useTenantContext';
 import { CrossDockBooking, PurchaseOrder, CartonCloudPO, CustomFieldValues } from '@/types/booking';
 import { useEffect } from 'react';
 import { Json } from '@/integrations/supabase/types';
+import { format } from 'date-fns';
+
+// Helper to format date as YYYY-MM-DD in local timezone (not UTC)
+const formatDateForDB = (date: Date | string): string => {
+  if (typeof date === 'string') return date;
+  return format(date, 'yyyy-MM-dd');
+};
 
 // Convert database row to frontend booking type
 const rowToBooking = (row: {
@@ -130,7 +137,7 @@ export const useCreateBooking = () => {
         .insert({
           tenant_id: activeTenant?.id || null,
           title: booking.title || 'New Booking',
-          date: booking.date instanceof Date ? booking.date.toISOString().split('T')[0] : String(booking.date),
+          date: formatDateForDB(booking.date || new Date()),
           start_time: booking.startTime || '09:00',
           end_time: booking.endTime || '10:00',
           carrier: booking.carrier || null,
@@ -167,7 +174,7 @@ export const useUpdateBooking = () => {
       
       if (booking.title !== undefined) updateData.title = booking.title;
       if (booking.date !== undefined) {
-        updateData.date = booking.date instanceof Date ? booking.date.toISOString().split('T')[0] : booking.date;
+        updateData.date = formatDateForDB(booking.date);
       }
       if (booking.startTime !== undefined) updateData.start_time = booking.startTime;
       if (booking.endTime !== undefined) updateData.end_time = booking.endTime;
