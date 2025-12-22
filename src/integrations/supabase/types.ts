@@ -145,6 +145,47 @@ export type Database = {
           },
         ]
       }
+      carriers: {
+        Row: {
+          booking_link_id: string
+          created_at: string
+          email: string | null
+          id: string
+          is_booking_link_enabled: boolean
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          booking_link_id?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_booking_link_enabled?: boolean
+          name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          booking_link_id?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_booking_link_enabled?: boolean
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carriers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cartoncloud_settings: {
         Row: {
           cartoncloud_tenant_id: string
