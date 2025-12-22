@@ -2,6 +2,9 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback 
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
+// Only log in development mode
+const isDev = import.meta.env.DEV;
+
 const PENDING_INVITE_KEY = 'dockmgmt_pending_invite';
 
 interface UserProfile {
@@ -70,8 +73,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const pendingToken = localStorage.getItem(PENDING_INVITE_KEY);
       if (!pendingToken) return;
 
-      console.log('[Auth] Found pending invite token, processing...');
-      
       const { data, error } = await supabase.functions.invoke('accept-invite', {
         body: { inviteToken: pendingToken },
       });
@@ -80,20 +81,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(PENDING_INVITE_KEY);
 
       if (error) {
-        console.error('[Auth] Error accepting pending invite:', error);
+        if (isDev) console.error('[Auth] Error accepting pending invite:', error.message);
         // Don't show error to user here - they can retry via invite link
         return;
       }
 
-      console.log('[Auth] Pending invite accepted successfully:', data);
-      
       // Refetch user data to get updated tenant/role
       await fetchUserData(currentUser.id);
       
       // Force a page reload to refresh all tenant context
       window.location.reload();
     } catch (err) {
-      console.error('[Auth] Error processing pending invite:', err);
+      if (isDev) console.error('[Auth] Error processing pending invite:', err);
       localStorage.removeItem(PENDING_INVITE_KEY);
     }
   }, [fetchUserData]);
@@ -102,7 +101,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('[Auth] Auth state changed:', event);
         setSession(session);
         setUser(session?.user ?? null);
         
