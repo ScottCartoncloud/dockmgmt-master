@@ -21,6 +21,7 @@ const rowToBooking = (row: {
   start_time: string;
   end_time: string;
   carrier: string | null;
+  carrier_id: string | null;
   truck_rego: string | null;
   pallets: number | null;
   dock_door_id: string | null;
@@ -33,7 +34,7 @@ const rowToBooking = (row: {
   created_by: string | null;
   created_at: string;
   updated_at: string;
-}, dockDoors?: { id: string; name: string }[]): CrossDockBooking => {
+}, dockDoors?: { id: string; name: string }[], carriers?: { id: string; name: string }[]): CrossDockBooking => {
   // Extract dock number from dock door name or find by ID
   let dockNumber: number | undefined;
   if (row.dock_door_id && dockDoors) {
@@ -44,13 +45,23 @@ const rowToBooking = (row: {
     }
   }
 
+  // Get carrier name: prefer carrier_id lookup, fallback to carrier text
+  let carrierName = row.carrier || '';
+  if (row.carrier_id && carriers) {
+    const linkedCarrier = carriers.find(c => c.id === row.carrier_id);
+    if (linkedCarrier) {
+      carrierName = linkedCarrier.name;
+    }
+  }
+
   return {
     id: row.id,
     title: row.title,
     date: new Date(row.date),
     startTime: row.start_time.slice(0, 5), // "HH:MM:SS" -> "HH:MM"
     endTime: row.end_time.slice(0, 5),
-    carrier: row.carrier || '',
+    carrier: carrierName,
+    carrierId: row.carrier_id || undefined,
     truckRego: row.truck_rego || undefined,
     pallets: row.pallets ?? undefined,
     dockNumber,
@@ -75,11 +86,17 @@ export const useBookings = () => {
     queryFn: async () => {
       if (!activeTenant?.id) return [];
 
-      // Fetch dock doors first for mapping
-      const { data: dockDoors } = await supabase
-        .from('dock_doors')
-        .select('id, name')
-        .eq('tenant_id', activeTenant.id);
+      // Fetch dock doors and carriers for mapping
+      const [{ data: dockDoors }, { data: carriers }] = await Promise.all([
+        supabase
+          .from('dock_doors')
+          .select('id, name')
+          .eq('tenant_id', activeTenant.id),
+        supabase
+          .from('carriers')
+          .select('id, name')
+          .eq('tenant_id', activeTenant.id),
+      ]);
 
       const { data, error } = await supabase
         .from('bookings')
@@ -90,7 +107,7 @@ export const useBookings = () => {
 
       if (error) throw error;
 
-      return (data || []).map((row) => rowToBooking(row, dockDoors || []));
+      return (data || []).map((row) => rowToBooking(row, dockDoors || [], carriers || []));
     },
     enabled: !!activeTenant?.id,
   });
@@ -129,7 +146,7 @@ export const useCreateBooking = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (booking: Partial<CrossDockBooking> & { dockDoorId?: string }) => {
+    mutationFn: async (booking: Partial<CrossDockBooking> & { dockDoorId?: string; carrierId?: string }) => {
       const { data: userData } = await supabase.auth.getUser();
       
       const { data, error } = await supabase
@@ -141,6 +158,7 @@ export const useCreateBooking = () => {
           start_time: booking.startTime || '09:00',
           end_time: booking.endTime || '10:00',
           carrier: booking.carrier || null,
+          carrier_id: booking.carrierId || null,
           truck_rego: booking.truckRego || null,
           pallets: booking.pallets ?? null,
           dock_door_id: booking.dockDoorId || null,
@@ -169,7 +187,7 @@ export const useUpdateBooking = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, ...booking }: Partial<CrossDockBooking> & { id: string; dockDoorId?: string }) => {
+    mutationFn: async ({ id, ...booking }: Partial<CrossDockBooking> & { id: string; dockDoorId?: string; carrierId?: string }) => {
       const updateData: Record<string, unknown> = {};
       
       if (booking.title !== undefined) updateData.title = booking.title;
@@ -179,6 +197,7 @@ export const useUpdateBooking = () => {
       if (booking.startTime !== undefined) updateData.start_time = booking.startTime;
       if (booking.endTime !== undefined) updateData.end_time = booking.endTime;
       if (booking.carrier !== undefined) updateData.carrier = booking.carrier || null;
+      if (booking.carrierId !== undefined) updateData.carrier_id = booking.carrierId || null;
       if (booking.truckRego !== undefined) updateData.truck_rego = booking.truckRego || null;
       if (booking.pallets !== undefined) updateData.pallets = booking.pallets ?? null;
       if (booking.dockDoorId !== undefined) updateData.dock_door_id = booking.dockDoorId || null;

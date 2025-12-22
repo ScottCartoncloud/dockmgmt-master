@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { CrossDockBooking, CartonCloudPO, CustomFieldValues } from '@/types/booking';
 import { format } from 'date-fns';
-import { X, Search, Package, ExternalLink, Trash2, Loader2 } from 'lucide-react';
+import { X, Search, Package, ExternalLink, Trash2, Loader2, Check, ChevronsUpDown, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,6 +39,7 @@ import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 import { useDockDoors } from '@/hooks/useDockDoors';
 import { useActiveCustomBookingFields } from '@/hooks/useCustomBookingFields';
 import { CustomFieldsRenderer } from '@/components/CustomFieldsRenderer';
+import { useCarriers, Carrier } from '@/hooks/useCarriers';
 
 interface BookingModalProps {
   open: boolean;
@@ -66,7 +67,10 @@ export function BookingModal({
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('10:00');
-  const [carrier, setCarrier] = useState('');
+  const [carrierName, setCarrierName] = useState('');
+  const [selectedCarrierId, setSelectedCarrierId] = useState<string | null>(null);
+  const [carrierSearchOpen, setCarrierSearchOpen] = useState(false);
+  const [carrierSearchTerm, setCarrierSearchTerm] = useState('');
   const [truckRego, setTruckRego] = useState('');
   const [selectedDockId, setSelectedDockId] = useState<string>('');
   const [notes, setNotes] = useState('');
@@ -80,9 +84,17 @@ export function BookingModal({
   const { data: cartonCloudSettings } = useCartonCloudSettings();
   const { data: dockDoors } = useDockDoors();
   const { data: customFields } = useActiveCustomBookingFields();
+  const { carriers } = useCarriers();
   const searchOrders = useSearchCartonCloudOrders();
   const isCartonCloudConnected = !!cartonCloudSettings;
   const activeDocks = useMemo(() => (dockDoors || []).filter((d) => d.is_active), [dockDoors]);
+  
+  // Filter carriers based on search term
+  const filteredCarriers = useMemo(() => {
+    if (!carrierSearchTerm.trim()) return carriers;
+    const term = carrierSearchTerm.toLowerCase();
+    return carriers.filter((c) => c.name.toLowerCase().includes(term));
+  }, [carriers, carrierSearchTerm]);
 
   const isEditing = !!booking;
 
@@ -112,7 +124,8 @@ export function BookingModal({
       setDate(format(booking.date, 'yyyy-MM-dd'));
       setStartTime(booking.startTime);
       setEndTime(booking.endTime);
-      setCarrier(booking.carrier);
+      setCarrierName(booking.carrier);
+      setSelectedCarrierId(booking.carrierId || null);
       setTruckRego(booking.truckRego || '');
       // Find dock ID from booking's dock_door_id
       setSelectedDockId(booking.dockDoorId || '');
@@ -127,7 +140,8 @@ export function BookingModal({
       setDate(defaultDate ? format(defaultDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'));
       setStartTime(defaultHour ? `${defaultHour.toString().padStart(2, '0')}:00` : '09:00');
       setEndTime(defaultHour ? `${(defaultHour + 1).toString().padStart(2, '0')}:00` : '10:00');
-      setCarrier('');
+      setCarrierName('');
+      setSelectedCarrierId(null);
       setTruckRego('');
       // Find dock ID from defaultDockNumber
       const defaultDock = defaultDockNumber ? activeDocks.find(d => {
@@ -142,6 +156,7 @@ export function BookingModal({
     }
     setSearchTerm('');
     setSearchResults([]);
+    setCarrierSearchTerm('');
   }, [booking, defaultDate, defaultHour, defaultDockNumber, open, activeDocks]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -176,7 +191,8 @@ export function BookingModal({
       date: new Date(date),
       startTime,
       endTime,
-      carrier,
+      carrier: carrierName,
+      carrierId: selectedCarrierId || undefined,
       truckRego: truckRego || undefined,
       pallets: validPallets,
       dockNumber,
@@ -401,13 +417,113 @@ export function BookingModal({
           {/* Carrier and Truck */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="carrier">Carrier</Label>
-              <Input
-                id="carrier"
-                value={carrier}
-                onChange={(e) => setCarrier(e.target.value)}
-                placeholder="e.g., Express Freight"
-              />
+              <Label>Carrier</Label>
+              <Popover open={carrierSearchOpen} onOpenChange={setCarrierSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={carrierSearchOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {carrierName ? (
+                      <div className="flex items-center gap-2 truncate">
+                        <Truck className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <span className="truncate">{carrierName}</span>
+                        {selectedCarrierId && (
+                          <Badge variant="secondary" className="text-xs shrink-0">Saved</Badge>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">Select or type carrier...</span>
+                    )}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Search or type carrier name..."
+                      value={carrierSearchTerm}
+                      onValueChange={(value) => {
+                        setCarrierSearchTerm(value);
+                        // Always update carrier name as user types
+                        setCarrierName(value);
+                        setSelectedCarrierId(null); // Clear selection when typing
+                      }}
+                    />
+                    <CommandList>
+                      {filteredCarriers.length === 0 && !carrierSearchTerm.trim() && (
+                        <div className="py-4 text-center text-sm text-muted-foreground">
+                          No carriers saved. Type to add one.
+                        </div>
+                      )}
+                      {carrierSearchTerm.trim() && filteredCarriers.length === 0 && (
+                        <CommandItem
+                          onSelect={() => {
+                            setCarrierName(carrierSearchTerm.trim());
+                            setSelectedCarrierId(null);
+                            setCarrierSearchOpen(false);
+                          }}
+                          className="cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Truck className="w-4 h-4" />
+                            <span>Use "{carrierSearchTerm.trim()}"</span>
+                          </div>
+                        </CommandItem>
+                      )}
+                      {filteredCarriers.length > 0 && (
+                        <CommandGroup heading="Saved Carriers">
+                          {filteredCarriers.map((c) => (
+                            <CommandItem
+                              key={c.id}
+                              onSelect={() => {
+                                setCarrierName(c.name);
+                                setSelectedCarrierId(c.id);
+                                setCarrierSearchOpen(false);
+                                setCarrierSearchTerm('');
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selectedCarrierId === c.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <Truck className="mr-2 h-4 w-4 text-muted-foreground" />
+                              <span>{c.name}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                      {carrierSearchTerm.trim() && filteredCarriers.length > 0 && !filteredCarriers.some(c => c.name.toLowerCase() === carrierSearchTerm.toLowerCase()) && (
+                        <CommandGroup heading="Custom">
+                          <CommandItem
+                            onSelect={() => {
+                              setCarrierName(carrierSearchTerm.trim());
+                              setSelectedCarrierId(null);
+                              setCarrierSearchOpen(false);
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Truck className="w-4 h-4" />
+                              <span>Use "{carrierSearchTerm.trim()}"</span>
+                            </div>
+                          </CommandItem>
+                        </CommandGroup>
+                      )}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {carrierName && !selectedCarrierId && (
+                <p className="text-xs text-muted-foreground">
+                  Custom carrier (not saved to your carriers list)
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="truckRego">Truck Rego</Label>
