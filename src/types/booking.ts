@@ -35,7 +35,8 @@ export interface CrossDockBooking {
   date: Date;
   startTime: string; // HH:MM format
   endTime: string;
-  carrier: string;
+  carrier: string; // Display name (from carrier table or free text)
+  carrierId?: string; // FK to carriers table (if selected from list)
   truckRego?: string;
   pallets?: number;
   dockNumber?: number;
