@@ -242,12 +242,13 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('id', carrier.tenant_id)
       .single();
 
-    // Create the booking
+    // Create the booking with carrier_id linked and carrier name stored
     const { data: booking, error: insertError } = await supabase
       .from('bookings')
       .insert({
         tenant_id: carrier.tenant_id,
         carrier_id: bookingData.carrierId,
+        carrier: carrier.name, // Store carrier name for display
         title: bookingData.title,
         date: bookingData.date,
         start_time: bookingData.startTime,
