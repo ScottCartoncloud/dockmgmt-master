@@ -143,6 +143,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "bookings_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "bookings_dock_door_id_fkey"
             columns: ["dock_door_id"]
             isOneToOne: false
@@ -492,6 +499,44 @@ export type Database = {
       }
     }
     Views: {
+      carriers_public: {
+        Row: {
+          booking_link_id: string | null
+          created_at: string | null
+          id: string | null
+          is_booking_link_enabled: boolean | null
+          name: string | null
+          tenant_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          booking_link_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_booking_link_enabled?: boolean | null
+          name?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          booking_link_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_booking_link_enabled?: boolean | null
+          name?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carriers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cartoncloud_settings_safe: {
         Row: {
           cartoncloud_tenant_id: string | null
