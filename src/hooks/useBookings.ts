@@ -4,12 +4,18 @@ import { useTenantContext } from '@/hooks/useTenantContext';
 import { CrossDockBooking, PurchaseOrder, CartonCloudPO, CustomFieldValues } from '@/types/booking';
 import { useEffect } from 'react';
 import { Json } from '@/integrations/supabase/types';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 
 // Helper to format date as YYYY-MM-DD in local timezone (not UTC)
 const formatDateForDB = (date: Date | string): string => {
   if (typeof date === 'string') return date;
   return format(date, 'yyyy-MM-dd');
+};
+
+// Parse YYYY-MM-DD string as local date (not UTC) to avoid timezone shift
+const parseDateFromDB = (dateStr: string): Date => {
+  // parse() interprets the date in local timezone, avoiding the UTC midnight issue
+  return parse(dateStr, 'yyyy-MM-dd', new Date());
 };
 
 // Convert database row to frontend booking type
@@ -57,7 +63,7 @@ const rowToBooking = (row: {
   return {
     id: row.id,
     title: row.title,
-    date: new Date(row.date),
+    date: parseDateFromDB(row.date),
     startTime: row.start_time.slice(0, 5), // "HH:MM:SS" -> "HH:MM"
     endTime: row.end_time.slice(0, 5),
     carrier: carrierName,
