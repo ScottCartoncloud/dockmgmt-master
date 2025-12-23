@@ -68,7 +68,7 @@ export function WeekView({
     const layouts = new Map<string, Map<string, { column: number; totalColumns: number }>>();
     
     weekDays.forEach(day => {
-      const dayKey = day.toISOString();
+      const dayKey = format(day, 'yyyy-MM-dd');
       const dayBookings = getBookingsForDay(day);
       const positions = calculateBookingLayout(dayBookings);
       
@@ -208,7 +208,7 @@ export function WeekView({
             <div className="w-[60px] flex-shrink-0 p-2 border-r border-border" />
             {weekDays.map((day) => (
               <div 
-                key={day.toISOString()} 
+                key={format(day, 'yyyy-MM-dd')} 
                 className="flex-1 p-2 text-center border-r border-border last:border-r-0"
               >
                 <div className="text-xs text-muted-foreground uppercase tracking-wide">
@@ -257,7 +257,7 @@ export function WeekView({
             
             return (
               <div 
-                key={day.toISOString()} 
+                key={format(day, 'yyyy-MM-dd')} 
                 ref={(el) => { gridRefs.current[dayIndex] = el; }}
                 className="flex-1 relative border-r border-border last:border-r-0"
                 onDragOver={(e) => handleDragOver(e, dayIndex)}
@@ -296,7 +296,7 @@ export function WeekView({
                 <div className="absolute inset-0 pointer-events-none">
                   {dayBookings.map((booking) => {
                     const style = getBookingPositionStyle(booking, START_HOUR);
-                    const layout = dayLayouts.get(day.toISOString())?.get(booking.id);
+                    const layout = dayLayouts.get(format(day, 'yyyy-MM-dd'))?.get(booking.id);
                     const layoutStyle = layout
                       ? getBookingLayoutStyle(layout.column, layout.totalColumns, 2)
                       : { left: '2px', right: '2px' };
