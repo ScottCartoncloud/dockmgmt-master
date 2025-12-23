@@ -186,9 +186,14 @@ export function DayView({
     }
   }, [hideAllPreviews]);
 
-  // Group bookings by dock
+  // Group bookings by dock - primary match is dock_door_id, fallback to dock number
   const getBookingsForDock = useCallback((dock: DockDoor) => {
     return dayBookings.filter(booking => {
+      // Primary: match by dock door ID
+      if (booking.dockDoorId) {
+        return booking.dockDoorId === dock.id;
+      }
+      // Fallback: match by dock number (for older bookings)
       if (booking.dockNumber) {
         const dockNum = parseInt(dock.name.replace(/\D/g, ''), 10);
         return booking.dockNumber === dockNum || dock.name.includes(booking.dockNumber.toString());

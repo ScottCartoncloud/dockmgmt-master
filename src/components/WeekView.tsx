@@ -49,14 +49,22 @@ export function WeekView({
   const weekStart = useMemo(() => startOfWeek(date, { weekStartsOn: 1 }), [date]);
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
-  // Get dock color for a booking based on its dock number
+  // Get dock color for a booking based on its dock door ID (fallback to dock number for backwards compat)
   const getDockColorForBooking = useCallback((booking: CrossDockBooking): string | undefined => {
-    if (!booking.dockNumber) return undefined;
-    const dock = activeDocks.find(d => 
-      d.name.includes(booking.dockNumber!.toString()) || 
-      parseInt(d.name.replace(/\D/g, ''), 10) === booking.dockNumber
-    );
-    return dock?.color;
+    // Primary: lookup by dock door ID
+    if (booking.dockDoorId) {
+      const dock = activeDocks.find(d => d.id === booking.dockDoorId);
+      if (dock) return dock.color;
+    }
+    // Fallback: lookup by dock number (for older bookings or manual entry)
+    if (booking.dockNumber) {
+      const dock = activeDocks.find(d => 
+        d.name.includes(booking.dockNumber!.toString()) || 
+        parseInt(d.name.replace(/\D/g, ''), 10) === booking.dockNumber
+      );
+      return dock?.color;
+    }
+    return undefined;
   }, [activeDocks]);
 
   const getBookingsForDay = useCallback((day: Date) => {
