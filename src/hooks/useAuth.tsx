@@ -71,26 +71,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const processPendingInvite = useCallback(async (currentUser: User) => {
     try {
       const pendingToken = localStorage.getItem(PENDING_INVITE_KEY);
-      if (!pendingToken) return;
+      
+      // Try token-based acceptance first
+      if (pendingToken) {
+        console.log('[Auth] Processing pending invite token for user:', currentUser.email);
+        
+        const { data, error } = await supabase.functions.invoke('accept-invite', {
+          body: { inviteToken: pendingToken },
+        });
 
-      const { data, error } = await supabase.functions.invoke('accept-invite', {
-        body: { inviteToken: pendingToken },
+        // Always clear the token after attempting
+        localStorage.removeItem(PENDING_INVITE_KEY);
+
+        if (!error && data?.success) {
+          console.log('[Auth] Invite accepted via token:', data);
+          // Refetch user data to get updated tenant/role
+          await fetchUserData(currentUser.id);
+          // Force a page reload to refresh all tenant context
+          window.location.reload();
+          return;
+        }
+        
+        if (isDev) console.error('[Auth] Token-based invite failed, trying email match:', error?.message);
+      }
+
+      // Fallback: Try to auto-match by email if user has no tenant
+      if (!currentUser.email) return;
+      
+      console.log('[Auth] Checking for pending invite by email:', currentUser.email);
+      
+      const { data: matchData, error: matchError } = await supabase.functions.invoke('accept-invite-by-email', {
+        body: { email: currentUser.email },
       });
 
-      // Always clear the token after attempting
-      localStorage.removeItem(PENDING_INVITE_KEY);
-
-      if (error) {
-        if (isDev) console.error('[Auth] Error accepting pending invite:', error.message);
-        // Don't show error to user here - they can retry via invite link
+      if (matchError) {
+        if (isDev) console.error('[Auth] Email-based invite match failed:', matchError.message);
         return;
       }
 
-      // Refetch user data to get updated tenant/role
-      await fetchUserData(currentUser.id);
-      
-      // Force a page reload to refresh all tenant context
-      window.location.reload();
+      if (matchData?.success) {
+        console.log('[Auth] Invite accepted via email match:', matchData);
+        await fetchUserData(currentUser.id);
+        window.location.reload();
+      }
     } catch (err) {
       if (isDev) console.error('[Auth] Error processing pending invite:', err);
       localStorage.removeItem(PENDING_INVITE_KEY);

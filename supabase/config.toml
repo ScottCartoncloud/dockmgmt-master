@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.recaptcha-config]
 verify_jwt = false
+
+[functions.accept-invite-by-email]
+verify_jwt = true
