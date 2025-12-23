@@ -104,7 +104,7 @@ export default function CarrierBooking() {
       // Fetch carrier and reCAPTCHA config in parallel
       const [carrierResult, recaptchaResult] = await Promise.all([
         supabase
-          .from('carriers')
+          .from('carriers_public')
           .select('id, name, tenant_id, is_booking_link_enabled')
           .eq('booking_link_id', bookingLinkId)
           .maybeSingle(),
