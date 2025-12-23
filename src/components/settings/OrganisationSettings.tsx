@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Building2, Globe, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -26,8 +26,20 @@ import {
   getDayName,
   COMMON_TIMEZONES,
 } from '@/hooks/useOrganisationSettings';
+import { useTenantContext } from '@/hooks/useTenantContext';
+
+const DEFAULT_WORKING_HOURS: WorkingHours[] = [
+  { tenant_id: '', day_of_week: 0, enabled: false, start_time: '08:00', end_time: '17:00' },
+  { tenant_id: '', day_of_week: 1, enabled: true, start_time: '08:00', end_time: '17:00' },
+  { tenant_id: '', day_of_week: 2, enabled: true, start_time: '08:00', end_time: '17:00' },
+  { tenant_id: '', day_of_week: 3, enabled: true, start_time: '08:00', end_time: '17:00' },
+  { tenant_id: '', day_of_week: 4, enabled: true, start_time: '08:00', end_time: '17:00' },
+  { tenant_id: '', day_of_week: 5, enabled: true, start_time: '08:00', end_time: '17:00' },
+  { tenant_id: '', day_of_week: 6, enabled: false, start_time: '08:00', end_time: '17:00' },
+];
 
 const OrganisationSettings = () => {
+  const { activeTenant } = useTenantContext();
   const {
     timezone,
     workingHours,
@@ -39,20 +51,22 @@ const OrganisationSettings = () => {
   } = useOrganisationSettings();
 
   const [selectedTimezone, setSelectedTimezone] = useState(timezone);
-  const [localWorkingHours, setLocalWorkingHours] = useState<WorkingHours[]>(() => {
-    // Always start with defaults
-    return [
-      { tenant_id: '', day_of_week: 0, enabled: false, start_time: '08:00', end_time: '17:00' },
-      { tenant_id: '', day_of_week: 1, enabled: true, start_time: '08:00', end_time: '17:00' },
-      { tenant_id: '', day_of_week: 2, enabled: true, start_time: '08:00', end_time: '17:00' },
-      { tenant_id: '', day_of_week: 3, enabled: true, start_time: '08:00', end_time: '17:00' },
-      { tenant_id: '', day_of_week: 4, enabled: true, start_time: '08:00', end_time: '17:00' },
-      { tenant_id: '', day_of_week: 5, enabled: true, start_time: '08:00', end_time: '17:00' },
-      { tenant_id: '', day_of_week: 6, enabled: false, start_time: '08:00', end_time: '17:00' },
-    ];
-  });
+  const [localWorkingHours, setLocalWorkingHours] = useState<WorkingHours[]>(DEFAULT_WORKING_HOURS);
   const [hasChanges, setHasChanges] = useState(false);
-  const [initialized, setInitialized] = useState(false);
+  
+  // Track the tenant ID to detect switches
+  const lastTenantIdRef = useRef<string | null>(null);
+
+  // Reset state when tenant changes
+  useEffect(() => {
+    if (activeTenant?.id && activeTenant.id !== lastTenantIdRef.current) {
+      // Tenant changed - reset local state
+      setLocalWorkingHours(DEFAULT_WORKING_HOURS);
+      setSelectedTimezone('UTC');
+      setHasChanges(false);
+      lastTenantIdRef.current = activeTenant.id;
+    }
+  }, [activeTenant?.id]);
 
   // Initialize local state when data loads
   useEffect(() => {
@@ -61,11 +75,10 @@ const OrganisationSettings = () => {
 
   // Sync working hours from database when they load
   useEffect(() => {
-    if (workingHours.length > 0 && !initialized) {
+    if (workingHours.length > 0) {
       setLocalWorkingHours(workingHours);
-      setInitialized(true);
     }
-  }, [workingHours, initialized]);
+  }, [workingHours]);
 
   // Track changes
   useEffect(() => {
