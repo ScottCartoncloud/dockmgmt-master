@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { CrossDockBooking, CartonCloudPO, CustomFieldValues } from '@/types/booking';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 import { X, Search, Package, ExternalLink, Trash2, Loader2, Check, ChevronsUpDown, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -188,7 +188,8 @@ export function BookingModal({
     onSave({
       id: booking?.id,
       title: title || (selectedPO ? `${selectedPO.customer} Delivery` : 'New Booking'),
-      date: new Date(date),
+      // Parse as a *local* date to avoid timezone shifting (e.g. North America seeing prior day)
+      date: parse(date, 'yyyy-MM-dd', new Date()),
       startTime,
       endTime,
       carrier: carrierName,
