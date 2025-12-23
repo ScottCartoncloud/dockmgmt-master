@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Building2, Globe, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -79,18 +79,20 @@ const OrganisationSettings = () => {
   };
 
   const handleDayToggle = (dayOfWeek: number, enabled: boolean) => {
-    setLocalWorkingHours(prev =>
-      prev.map(h =>
-        h.day_of_week === dayOfWeek ? { ...h, enabled } : h
-      )
+    console.log('[OrganisationSettings] toggle day', { dayOfWeek, enabled });
+    setLocalWorkingHours((prev) =>
+      prev.map((h) => (h.day_of_week === dayOfWeek ? { ...h, enabled } : h))
     );
   };
 
-  const handleTimeChange = (dayOfWeek: number, field: 'start_time' | 'end_time', value: string) => {
-    setLocalWorkingHours(prev =>
-      prev.map(h =>
-        h.day_of_week === dayOfWeek ? { ...h, [field]: value } : h
-      )
+  const handleTimeChange = (
+    dayOfWeek: number,
+    field: 'start_time' | 'end_time',
+    value: string
+  ) => {
+    console.log('[OrganisationSettings] change time', { dayOfWeek, field, value });
+    setLocalWorkingHours((prev) =>
+      prev.map((h) => (h.day_of_week === dayOfWeek ? { ...h, [field]: value } : h))
     );
   };
 
@@ -108,6 +110,13 @@ const OrganisationSettings = () => {
     setLocalWorkingHours(workingHours.length > 0 ? workingHours : localWorkingHours);
     setHasChanges(false);
   };
+
+  const sortedWorkingHours = useMemo(() => {
+    const order = [1, 2, 3, 4, 5, 6, 0];
+    return [...localWorkingHours].sort(
+      (a, b) => order.indexOf(a.day_of_week) - order.indexOf(b.day_of_week)
+    );
+  }, [localWorkingHours]);
 
   // Get browser timezone for suggestion
   const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -193,43 +202,35 @@ const OrganisationSettings = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {localWorkingHours
-                .sort((a, b) => {
-                  // Sort with Monday first (1,2,3,4,5,6,0)
-                  const order = [1, 2, 3, 4, 5, 6, 0];
-                  return order.indexOf(a.day_of_week) - order.indexOf(b.day_of_week);
-                })
-                .map((day) => (
-                  <TableRow key={day.day_of_week}>
-                    <TableCell className="font-medium">
-                      {getDayName(day.day_of_week)}
-                    </TableCell>
-                    <TableCell>
-                      <Switch
-                        checked={day.enabled}
-                        onCheckedChange={(checked) => handleDayToggle(day.day_of_week, checked)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="time"
-                        value={day.start_time}
-                        onChange={(e) => handleTimeChange(day.day_of_week, 'start_time', e.target.value)}
-                        disabled={!day.enabled}
-                        className="w-32"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="time"
-                        value={day.end_time}
-                        onChange={(e) => handleTimeChange(day.day_of_week, 'end_time', e.target.value)}
-                        disabled={!day.enabled}
-                        className="w-32"
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
+              {sortedWorkingHours.map((day) => (
+                <TableRow key={day.day_of_week}>
+                  <TableCell className="font-medium">{getDayName(day.day_of_week)}</TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={!!day.enabled}
+                      onCheckedChange={(checked) => handleDayToggle(day.day_of_week, checked)}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="time"
+                      value={day.start_time}
+                      onChange={(e) => handleTimeChange(day.day_of_week, 'start_time', e.target.value)}
+                      disabled={!day.enabled}
+                      className="w-32"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="time"
+                      value={day.end_time}
+                      onChange={(e) => handleTimeChange(day.day_of_week, 'end_time', e.target.value)}
+                      disabled={!day.enabled}
+                      className="w-32"
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </div>
