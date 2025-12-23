@@ -8,7 +8,8 @@ import {
   Users,
   Clock,
   LogOut,
-  Truck
+  Truck,
+  Building2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,7 +34,7 @@ const roleLabels: Record<string, string> = {
 
 export function Header() {
   const navigate = useNavigate();
-  const { user, profile, roles, signOut, isAdmin } = useAuth();
+  const { user, profile, roles, signOut, isAdmin, isSuperUser } = useAuth();
 
   const primaryRole = roles[0]?.role || 'viewer';
   const displayName = profile?.full_name || user?.email || 'User';
@@ -117,6 +118,12 @@ export function Header() {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-xs text-muted-foreground">Administration</DropdownMenuLabel>
+            {(isAdmin || isSuperUser) && (
+              <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=organisation')}>
+                <Building2 className="w-4 h-4" />
+                Organisation Settings
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=users')}>
               <Users className="w-4 h-4" />
               User Management

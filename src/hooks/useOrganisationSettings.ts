@@ -61,9 +61,19 @@ export const COMMON_TIMEZONES = [
   'UTC',
 ];
 
+// Get browser timezone as fallback
+const getBrowserTimezone = (): string => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return 'UTC';
+  }
+};
+
 export const useOrganisationSettings = () => {
   const { activeTenant } = useTenantContext();
   const queryClient = useQueryClient();
+  const browserTimezone = getBrowserTimezone();
 
   // Fetch tenant timezone
   const { data: tenantData, isLoading: isLoadingTenant } = useQuery({
@@ -82,6 +92,11 @@ export const useOrganisationSettings = () => {
     },
     enabled: !!activeTenant?.id,
   });
+
+  // Determine effective timezone (tenant timezone or browser fallback)
+  const tenantTimezone = tenantData?.timezone;
+  const effectiveTimezone = tenantTimezone || browserTimezone;
+  const isUsingFallbackTimezone = !tenantTimezone;
 
   // Fetch working hours
   const { data: workingHours, isLoading: isLoadingHours } = useQuery({
@@ -170,7 +185,9 @@ export const useOrganisationSettings = () => {
   };
 
   return {
-    timezone: tenantData?.timezone || 'UTC',
+    timezone: effectiveTimezone,
+    isUsingFallbackTimezone,
+    browserTimezone,
     workingHours: workingHours || [],
     isLoading: isLoadingTenant || isLoadingHours,
     updateTimezone: updateTimezoneMutation.mutate,
