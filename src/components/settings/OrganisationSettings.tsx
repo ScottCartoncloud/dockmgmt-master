@@ -39,31 +39,33 @@ const OrganisationSettings = () => {
   } = useOrganisationSettings();
 
   const [selectedTimezone, setSelectedTimezone] = useState(timezone);
-  const [localWorkingHours, setLocalWorkingHours] = useState<WorkingHours[]>([]);
+  const [localWorkingHours, setLocalWorkingHours] = useState<WorkingHours[]>(() => {
+    // Always start with defaults
+    return [
+      { tenant_id: '', day_of_week: 0, enabled: false, start_time: '08:00', end_time: '17:00' },
+      { tenant_id: '', day_of_week: 1, enabled: true, start_time: '08:00', end_time: '17:00' },
+      { tenant_id: '', day_of_week: 2, enabled: true, start_time: '08:00', end_time: '17:00' },
+      { tenant_id: '', day_of_week: 3, enabled: true, start_time: '08:00', end_time: '17:00' },
+      { tenant_id: '', day_of_week: 4, enabled: true, start_time: '08:00', end_time: '17:00' },
+      { tenant_id: '', day_of_week: 5, enabled: true, start_time: '08:00', end_time: '17:00' },
+      { tenant_id: '', day_of_week: 6, enabled: false, start_time: '08:00', end_time: '17:00' },
+    ];
+  });
   const [hasChanges, setHasChanges] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
   // Initialize local state when data loads
   useEffect(() => {
     setSelectedTimezone(timezone);
   }, [timezone]);
 
+  // Sync working hours from database when they load
   useEffect(() => {
-    if (workingHours.length > 0) {
+    if (workingHours.length > 0 && !initialized) {
       setLocalWorkingHours(workingHours);
-    } else if (!isLoading && workingHours.length === 0) {
-      // Initialize with defaults if none exist
-      const defaultHours: WorkingHours[] = [
-        { tenant_id: '', day_of_week: 0, enabled: false, start_time: '08:00', end_time: '17:00' },
-        { tenant_id: '', day_of_week: 1, enabled: true, start_time: '08:00', end_time: '17:00' },
-        { tenant_id: '', day_of_week: 2, enabled: true, start_time: '08:00', end_time: '17:00' },
-        { tenant_id: '', day_of_week: 3, enabled: true, start_time: '08:00', end_time: '17:00' },
-        { tenant_id: '', day_of_week: 4, enabled: true, start_time: '08:00', end_time: '17:00' },
-        { tenant_id: '', day_of_week: 5, enabled: true, start_time: '08:00', end_time: '17:00' },
-        { tenant_id: '', day_of_week: 6, enabled: false, start_time: '08:00', end_time: '17:00' },
-      ];
-      setLocalWorkingHours(defaultHours);
+      setInitialized(true);
     }
-  }, [workingHours, isLoading]);
+  }, [workingHours, initialized]);
 
   // Track changes
   useEffect(() => {
