@@ -4,9 +4,10 @@ import { CartonCloudIntegration } from '@/components/settings/CartonCloudIntegra
 import { CardConfiguration } from '@/components/settings/CardConfiguration';
 import { UserManagement } from '@/components/settings/UserManagement';
 import { CarrierManagement } from '@/components/settings/CarrierManagement';
+import OrganisationSettings from '@/components/settings/OrganisationSettings';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DoorOpen, Link2, Users, Clock, LayoutGrid, Truck } from 'lucide-react';
+import { DoorOpen, Link2, Users, Clock, LayoutGrid, Truck, Building2 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -51,6 +52,12 @@ const Settings = () => {
                 <span className="hidden sm:inline">Integration</span>
               </TabsTrigger>
             )}
+            {canAccessIntegration && (
+              <TabsTrigger value="organisation" className="gap-2">
+                <Building2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Organisation</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="users" className="gap-2">
               <Users className="w-4 h-4" />
               <span className="hidden sm:inline">Users</span>
@@ -90,6 +97,16 @@ const Settings = () => {
               <Card>
                 <CardContent className="pt-6">
                   <CartonCloudIntegration />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {canAccessIntegration && (
+            <TabsContent value="organisation">
+              <Card>
+                <CardContent className="pt-6">
+                  <OrganisationSettings />
                 </CardContent>
               </Card>
             </TabsContent>
