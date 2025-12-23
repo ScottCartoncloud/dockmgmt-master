@@ -1,7 +1,7 @@
 import { CrossDockBooking } from '@/types/booking';
 import { HOURS } from '@/lib/calendarConstants';
 import { DraggableBookingCard } from './DraggableBookingCard';
-import { format, startOfWeek, addDays, isSameDay } from 'date-fns';
+import { format, startOfWeek, addDays, isSameDay, getDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useRef, DragEvent, useMemo, useCallback } from 'react';
 import { useDockDoors } from '@/hooks/useDockDoors';
@@ -13,6 +13,13 @@ import {
   getBookingPositionStyle,
   extractDragData,
 } from '@/hooks/useDragAndDrop';
+import { useWorkingHours } from '@/hooks/useWorkingHours';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 const START_HOUR = HOURS[0]?.hour || 6;
 
@@ -34,6 +41,7 @@ export function WeekView({
   onBookingResize
 }: WeekViewProps) {
   const { data: dockDoors } = useDockDoors();
+  const { isHourWorking, isDayWorking } = useWorkingHours();
   
   // Use refs for drag state to avoid re-renders
   const gridRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -273,23 +281,30 @@ export function WeekView({
                 onDrop={(e) => handleDrop(e, day, dayIndex)}
               >
                 {/* Hour grid lines and click targets */}
-                {HOURS.map(({ hour }) => (
-                  <div
-                    key={hour}
-                    className={cn(
-                      'border-b border-border cursor-pointer transition-colors relative',
-                      isCurrentHour(day, hour) && 'bg-accent/5',
-                      'hover:bg-muted/50'
-                    )}
-                    style={{ height: HOUR_HEIGHT }}
-                    onClick={() => onTimeSlotClick(day, hour)}
-                  >
-                    {/* 15-minute tick marks */}
-                    <div className="absolute left-0 right-0 top-[25%] border-t border-dashed border-border/40" />
-                    <div className="absolute left-0 right-0 top-[50%] border-t border-dotted border-border/60" />
-                    <div className="absolute left-0 right-0 top-[75%] border-t border-dashed border-border/40" />
-                  </div>
-                ))}
+                {HOURS.map(({ hour }) => {
+                  const dayOfWeek = getDay(day);
+                  const isWorking = isHourWorking(hour, dayOfWeek) && isDayWorking(dayOfWeek);
+                  
+                  return (
+                    <div
+                      key={hour}
+                      className={cn(
+                        'border-b border-border transition-colors relative',
+                        isCurrentHour(day, hour) && 'bg-accent/5',
+                        !isWorking && 'bg-muted/40 cursor-not-allowed',
+                        isWorking && 'cursor-pointer hover:bg-muted/50'
+                      )}
+                      style={{ height: HOUR_HEIGHT }}
+                      onClick={() => isWorking && onTimeSlotClick(day, hour)}
+                      title={!isWorking ? 'Outside working hours' : undefined}
+                    >
+                      {/* 15-minute tick marks */}
+                      <div className="absolute left-0 right-0 top-[25%] border-t border-dashed border-border/40" />
+                      <div className="absolute left-0 right-0 top-[50%] border-t border-dotted border-border/60" />
+                      <div className="absolute left-0 right-0 top-[75%] border-t border-dashed border-border/40" />
+                    </div>
+                  );
+                })}
 
                 {/* Drag preview ghost for this column - managed via refs */}
                 <div
