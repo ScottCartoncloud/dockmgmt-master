@@ -1,7 +1,7 @@
 import { CrossDockBooking } from '@/types/booking';
 import { HOURS } from '@/lib/calendarConstants';
 import { DraggableBookingCard } from './DraggableBookingCard';
-import { format, isSameDay } from 'date-fns';
+import { format, isSameDay, getDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useRef, DragEvent, useMemo, useCallback } from 'react';
 import { useDockDoors, DockDoor } from '@/hooks/useDockDoors';
@@ -15,6 +15,13 @@ import {
   extractDragData,
   formatTime,
 } from '@/hooks/useDragAndDrop';
+import { useWorkingHours } from '@/hooks/useWorkingHours';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 const START_HOUR = HOURS[0]?.hour || 6;
 const MIN_DOCK_WIDTH = 180;
@@ -37,6 +44,7 @@ export function DayView({
   onBookingResize
 }: DayViewProps) {
   const { data: dockDoors, isLoading: isLoadingDocks } = useDockDoors();
+  const { isHourWorking, isDayWorking, getHoursForDay } = useWorkingHours();
   
   // Use refs to avoid re-renders during drag
   const gridRef = useRef<HTMLDivElement>(null);
@@ -51,11 +59,18 @@ export function DayView({
   
   const activeDocks = useMemo(() => dockDoors?.filter(d => d.is_active) || [], [dockDoors]);
   const dayBookings = useMemo(() => bookings.filter((b) => isSameDay(b.date, date)), [bookings, date]);
+  const dayOfWeek = getDay(date);
+  const isWorkingDay = isDayWorking(dayOfWeek);
+  const workingHoursConfig = getHoursForDay(dayOfWeek);
 
   const isCurrentHour = useCallback((hour: number) => {
     const now = new Date();
     return isSameDay(date, now) && now.getHours() === hour;
   }, [date]);
+  
+  const isHourInWorkingRange = useCallback((hour: number) => {
+    return isHourWorking(hour, dayOfWeek);
+  }, [isHourWorking, dayOfWeek]);
 
   const getDockIdFromPosition = useCallback((clientX: number): string | null => {
     if (!gridRef.current || activeDocks.length === 0) return null;
@@ -325,23 +340,29 @@ export function DayView({
                   style={{ minWidth: MIN_DOCK_WIDTH }}
                 >
                   {/* Hour grid lines and click targets */}
-                  {HOURS.map(({ hour }) => (
-                    <div
-                      key={hour}
-                      className={cn(
-                        'border-b border-border cursor-pointer transition-colors relative',
-                        isCurrentHour(hour) && 'bg-accent/5',
-                        'hover:bg-muted/50'
-                      )}
-                      style={{ height: HOUR_HEIGHT }}
-                      onClick={() => onTimeSlotClick(date, hour, dock.id)}
-                    >
-                      {/* 15-minute tick marks */}
-                      <div className="absolute left-0 right-0 top-[25%] border-t border-dashed border-border/40" />
-                      <div className="absolute left-0 right-0 top-[50%] border-t border-dotted border-border/60" />
-                      <div className="absolute left-0 right-0 top-[75%] border-t border-dashed border-border/40" />
-                    </div>
-                  ))}
+                  {HOURS.map(({ hour }) => {
+                    const isWorking = isHourInWorkingRange(hour) && isWorkingDay;
+                    
+                    return (
+                      <div
+                        key={hour}
+                        className={cn(
+                          'border-b border-border transition-colors relative',
+                          isCurrentHour(hour) && 'bg-accent/5',
+                          !isWorking && 'bg-muted/40 cursor-not-allowed',
+                          isWorking && 'cursor-pointer hover:bg-muted/50'
+                        )}
+                        style={{ height: HOUR_HEIGHT }}
+                        onClick={() => isWorking && onTimeSlotClick(date, hour, dock.id)}
+                        title={!isWorking ? 'Outside working hours' : undefined}
+                      >
+                        {/* 15-minute tick marks */}
+                        <div className="absolute left-0 right-0 top-[25%] border-t border-dashed border-border/40" />
+                        <div className="absolute left-0 right-0 top-[50%] border-t border-dotted border-border/60" />
+                        <div className="absolute left-0 right-0 top-[75%] border-t border-dashed border-border/40" />
+                      </div>
+                    );
+                  })}
 
                   {/* Bookings for this dock */}
                   <div className="absolute inset-0 pointer-events-none">
