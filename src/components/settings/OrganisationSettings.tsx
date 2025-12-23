@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Building2, Globe, Clock } from 'lucide-react';
+import { Building2, Globe, Clock, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Select,
   SelectContent,
@@ -42,6 +43,8 @@ const OrganisationSettings = () => {
   const { activeTenant } = useTenantContext();
   const {
     timezone,
+    isUsingFallbackTimezone,
+    browserTimezone,
     workingHours,
     isLoading,
     updateTimezone,
@@ -131,9 +134,6 @@ const OrganisationSettings = () => {
     );
   }, [localWorkingHours]);
 
-  // Get browser timezone for suggestion
-  const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -155,6 +155,16 @@ const OrganisationSettings = () => {
         <Building2 className="w-5 h-5 text-accent" />
         <h2 className="text-xl font-semibold text-foreground">Organisation Settings</h2>
       </div>
+
+      {/* Fallback timezone banner */}
+      {isUsingFallbackTimezone && (
+        <Alert className="border-amber-500/50 bg-amber-500/10">
+          <Info className="h-4 w-4 text-amber-500" />
+          <AlertDescription className="text-foreground">
+            We've applied your local timezone (<strong>{browserTimezone.replace(/_/g, ' ')}</strong>) — update it below if needed.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Timezone Section */}
       <div className="space-y-4">
