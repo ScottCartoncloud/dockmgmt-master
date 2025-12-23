@@ -404,23 +404,67 @@ export type Database = {
           },
         ]
       }
+      tenant_working_hours: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          enabled: boolean
+          end_time: string
+          id: string
+          start_time: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          enabled?: boolean
+          end_time?: string
+          id?: string
+          start_time?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          enabled?: boolean
+          end_time?: string
+          id?: string
+          start_time?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_working_hours_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           created_at: string
           id: string
           name: string
+          timezone: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          timezone?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          timezone?: string | null
           updated_at?: string
         }
         Relationships: []
