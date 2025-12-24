@@ -26,20 +26,22 @@ export function useCartonCloudSettings() {
       let query = supabase
         .from('cartoncloud_settings_safe')
         .select('id, cartoncloud_tenant_id, tenant_id, is_active, created_at, updated_at, has_credentials');
-      
+
       if (activeTenant?.id) {
         query = query.eq('tenant_id', activeTenant.id);
       }
-      
+
       const { data, error } = await query.maybeSingle();
-      
+
       if (error) throw error;
-      
+
       if (!data) return null;
-      
+
       return data as CartonCloudSettings;
     },
     enabled: !!activeTenant?.id,
+    // Prevent “tab switch back” from re-fetching and resetting the form UI.
+    refetchOnWindowFocus: false,
   });
 }
 
