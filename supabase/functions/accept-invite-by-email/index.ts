@@ -142,12 +142,12 @@ serve(async (req) => {
       });
     }
 
-    // Find pending invites for this email
+    // Find pending invites for this email (case-insensitive)
     const nowIso = new Date().toISOString();
     const { data: invites, error: inviteError } = await admin
       .from("tenant_invites")
       .select("id, email, tenant_id, role, accepted_at, expires_at")
-      .eq("email", user.email.toLowerCase())
+      .ilike("email", user.email)
       .is("accepted_at", null)
       .gt("expires_at", nowIso);
 
