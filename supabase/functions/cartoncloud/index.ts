@@ -264,9 +264,9 @@ async function testConnection(
 
 // Helper to validate user authorization
 async function validateUserAuthorization(
-  supabaseClient: any, 
-  userId: string, 
-): Promise<{ authorized: boolean; error?: string }> {
+  supabaseClient: any,
+  userId: string,
+): Promise<{ authorized: boolean; error?: string; roles?: string[]; isSuperUser?: boolean }> {
   const { data: roles, error: rolesError } = await supabaseClient
     .from('user_roles')
     .select('role')
@@ -278,14 +278,20 @@ async function validateUserAuthorization(
   }
 
   const userRoles = roles?.map((r: { role: string }) => r.role) || [];
-  const isAuthorized = userRoles.includes('admin') || userRoles.includes('super_user');
+  const isSuperUser = userRoles.includes('super_user');
+  const isAuthorized = userRoles.includes('admin') || isSuperUser;
 
   if (!isAuthorized) {
     console.log('User not authorized - roles:', userRoles);
-    return { authorized: false, error: 'Insufficient permissions. Admin or Super User role required.' };
+    return {
+      authorized: false,
+      error: 'Insufficient permissions. Admin or Super User role required.',
+      roles: userRoles,
+      isSuperUser,
+    };
   }
 
-  return { authorized: true };
+  return { authorized: true, roles: userRoles, isSuperUser };
 }
 
 serve(async (req) => {
@@ -354,20 +360,40 @@ serve(async (req) => {
     const userTenantId = profile?.tenant_id;
     console.log('User tenant_id:', userTenantId);
 
-    const { authorized, error: authzError } = await validateUserAuthorization(
-      supabaseClient, 
-      user.id
-    );
+     const authz = await validateUserAuthorization(
+       supabaseClient,
+       user.id
+     );
 
-    if (!authorized) {
-      return new Response(
-        JSON.stringify({ error: authzError }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+     if (!authz.authorized) {
+       return new Response(
+         JSON.stringify({ error: authz.error }),
+         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+       );
+     }
 
-    const { action, searchTerm, clientId, clientSecret, tenantId } = await req.json();
-    console.log('CartonCloud function called with action:', action);
+     let rawBody: any;
+     try {
+       rawBody = await req.json();
+     } catch {
+       return new Response(
+         JSON.stringify({ error: 'Invalid request body' }),
+         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+       );
+     }
+
+     const { action, searchTerm, clientId, clientSecret, tenantId, appTenantId } = rawBody;
+     console.log('CartonCloud function called with action:', action);
+
+     const requestedTenantId = typeof appTenantId === 'string' ? appTenantId : null;
+     const effectiveTenantId = requestedTenantId && authz.isSuperUser ? requestedTenantId : userTenantId;
+
+     if (requestedTenantId && !authz.isSuperUser && userTenantId !== requestedTenantId) {
+       return new Response(
+         JSON.stringify({ error: 'Insufficient permissions for selected tenant' }),
+         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+       );
+     }
 
     if (action && typeof action !== 'string') {
       return new Response(
@@ -411,34 +437,38 @@ serve(async (req) => {
       });
     }
 
-    // Test saved connection (for existing credentials in database)
-    if (action === 'test-saved-connection') {
-      // Use service client to access encrypted credentials (base table blocked from regular clients)
-      let settingsQuery = supabaseServiceClient
-        .from('cartoncloud_settings')
-        .select('*')
-        .eq('is_active', true);
+     // Test saved connection (for existing credentials in database)
+     if (action === 'test-saved-connection') {
+       if (!effectiveTenantId) {
+         return new Response(
+           JSON.stringify({ success: false, message: 'No tenant selected' }),
+           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+         );
+       }
 
-      if (userTenantId) {
-        settingsQuery = settingsQuery.eq('tenant_id', userTenantId);
-      }
+       // Use service client to access encrypted credentials (base table blocked from regular clients)
+       const settingsQuery = supabaseServiceClient
+         .from('cartoncloud_settings')
+         .select('*')
+         .eq('is_active', true)
+         .eq('tenant_id', effectiveTenantId);
 
-      const { data: savedSettings, error: savedSettingsError } = await settingsQuery.maybeSingle();
+       const { data: savedSettings, error: savedSettingsError } = await settingsQuery.maybeSingle();
 
-      if (savedSettingsError) {
-        console.error('Error fetching settings:', savedSettingsError.message);
-        return new Response(
-          JSON.stringify({ success: false, message: 'Failed to fetch CartonCloud settings' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+       if (savedSettingsError) {
+         console.error('Error fetching settings:', savedSettingsError.message);
+         return new Response(
+           JSON.stringify({ success: false, message: 'Failed to fetch CartonCloud settings' }),
+           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+         );
+       }
 
-      if (!savedSettings) {
-        return new Response(
-          JSON.stringify({ success: false, message: 'CartonCloud integration not configured' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+       if (!savedSettings) {
+         return new Response(
+           JSON.stringify({ success: false, message: 'CartonCloud integration not configured' }),
+           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+         );
+       }
 
       let decClientId = savedSettings.client_id;
       let decClientSecret = savedSettings.client_secret;
@@ -473,32 +503,36 @@ serve(async (req) => {
       });
     }
 
-    // Fetch settings for other actions (use service client to access encrypted credentials)
-    let settingsQuery = supabaseServiceClient
-      .from('cartoncloud_settings')
-      .select('*')
-      .eq('is_active', true);
+     // Fetch settings for other actions (use service client to access encrypted credentials)
+     if (!effectiveTenantId) {
+       return new Response(
+         JSON.stringify({ error: 'No tenant selected' }),
+         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+       );
+     }
 
-    if (userTenantId) {
-      settingsQuery = settingsQuery.eq('tenant_id', userTenantId);
-    }
+     const settingsQuery = supabaseServiceClient
+       .from('cartoncloud_settings')
+       .select('*')
+       .eq('is_active', true)
+       .eq('tenant_id', effectiveTenantId);
 
-    const { data: settings, error: settingsError } = await settingsQuery.maybeSingle();
+     const { data: settings, error: settingsError } = await settingsQuery.maybeSingle();
 
-    if (settingsError) {
-      console.error('Error fetching settings:', settingsError.message);
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch CartonCloud settings' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+     if (settingsError) {
+       console.error('Error fetching settings:', settingsError.message);
+       return new Response(
+         JSON.stringify({ error: 'Failed to fetch CartonCloud settings' }),
+         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+       );
+     }
 
-    if (!settings) {
-      return new Response(
-        JSON.stringify({ error: 'CartonCloud integration not configured' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+     if (!settings) {
+       return new Response(
+         JSON.stringify({ error: 'CartonCloud integration not configured' }),
+         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+       );
+     }
 
     logAudit('CARTONCLOUD_CREDENTIALS_ACCESS', user.id, userTenantId, {
       action,
