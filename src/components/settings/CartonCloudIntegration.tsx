@@ -36,6 +36,10 @@ export function CartonCloudIntegration() {
   const [tenantId, setTenantId] = useState('');
   const [showSecret, setShowSecret] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [isEditingCredentials, setIsEditingCredentials] = useState(false);
+
+  // Masked placeholder to show credentials are saved
+  const MASKED_VALUE = '••••••••••••••••';
 
   // NOTE: Credentials (client_id, client_secret) are never exposed to the client for security.
   // When settings exist, we only get metadata. User must re-enter credentials to update.
@@ -47,8 +51,11 @@ export function CartonCloudIntegration() {
       // Clear credential fields - they're stored securely but never returned
       setClientId('');
       setClientSecret('');
+      setIsEditingCredentials(false);
     }
   }, [settings]);
+
+  const hasCredentialsSaved = !!settings?.has_credentials;
 
   const handleTestConnection = async () => {
     setConnectionStatus('idle');
@@ -100,6 +107,7 @@ export function CartonCloudIntegration() {
       setClientId('');
       setClientSecret('');
       setShowSecret(false);
+      setIsEditingCredentials(false);
       setConnectionStatus('success');
       toast.success('CartonCloud settings saved successfully');
     } catch (error) {
@@ -107,6 +115,18 @@ export function CartonCloudIntegration() {
       const message = error instanceof Error ? error.message : 'Failed to save settings';
       toast.error(message);
     }
+  };
+
+  const handleStartEditing = () => {
+    setIsEditingCredentials(true);
+    setClientId('');
+    setClientSecret('');
+  };
+
+  const handleCancelEditing = () => {
+    setIsEditingCredentials(false);
+    setClientId('');
+    setClientSecret('');
   };
 
   const handleDisconnect = async () => {
@@ -154,63 +174,111 @@ export function CartonCloudIntegration() {
       </p>
 
       <div className="space-y-4">
-        {isConnected && (
-          <div className="p-3 bg-muted/50 border border-border rounded-md">
-            <p className="text-sm text-muted-foreground">
-              Credentials are securely stored. Enter new values below to update them.
-            </p>
-          </div>
+        {hasCredentialsSaved && !isEditingCredentials ? (
+          <>
+            {/* Show masked credentials when connected and not editing */}
+            <div className="space-y-2">
+              <Label htmlFor="clientId">Client ID</Label>
+              <Input
+                id="clientId"
+                value={MASKED_VALUE}
+                disabled
+                className="bg-muted/50"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="clientSecret">Client Secret</Label>
+              <Input
+                id="clientSecret"
+                type="password"
+                value={MASKED_VALUE}
+                disabled
+                className="bg-muted/50"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="tenantId">Tenant ID</Label>
+              <Input
+                id="tenantId"
+                value={tenantId}
+                onChange={(e) => setTenantId(e.target.value)}
+                placeholder="Enter your CartonCloud Tenant ID (UUID)"
+              />
+              <p className="text-xs text-muted-foreground">
+                You can find your Tenant ID in CartonCloud under Settings → API Clients
+              </p>
+            </div>
+
+            <div className="p-3 bg-muted/50 border border-border rounded-md">
+              <p className="text-sm text-muted-foreground">
+                Credentials are securely stored. Click "Update Credentials" to enter new values.
+              </p>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Show input fields for new credentials */}
+            {isEditingCredentials && (
+              <div className="p-3 bg-primary/10 border border-primary/20 rounded-md">
+                <p className="text-sm text-primary">
+                  Enter your new credentials below. All fields are required to save.
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="clientId">Client ID</Label>
+              <Input
+                id="clientId"
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                placeholder="Enter your CartonCloud Client ID"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="clientSecret">Client Secret</Label>
+              <div className="relative">
+                <Input
+                  id="clientSecret"
+                  type={showSecret ? 'text' : 'password'}
+                  value={clientSecret}
+                  onChange={(e) => setClientSecret(e.target.value)}
+                  placeholder="Enter your CartonCloud Client Secret"
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  onClick={() => setShowSecret(!showSecret)}
+                >
+                  {showSecret ? (
+                    <EyeOff className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="tenantId">Tenant ID</Label>
+              <Input
+                id="tenantId"
+                value={tenantId}
+                onChange={(e) => setTenantId(e.target.value)}
+                placeholder="Enter your CartonCloud Tenant ID (UUID)"
+              />
+              <p className="text-xs text-muted-foreground">
+                You can find your Tenant ID in CartonCloud under Settings → API Clients
+              </p>
+            </div>
+          </>
         )}
-
-        <div className="space-y-2">
-          <Label htmlFor="clientId">Client ID</Label>
-          <Input
-            id="clientId"
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-            placeholder={isConnected ? "Enter new Client ID to update" : "Enter your CartonCloud Client ID"}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="clientSecret">Client Secret</Label>
-          <div className="relative">
-            <Input
-              id="clientSecret"
-              type={showSecret ? 'text' : 'password'}
-              value={clientSecret}
-              onChange={(e) => setClientSecret(e.target.value)}
-              placeholder={isConnected ? "Enter new Client Secret to update" : "Enter your CartonCloud Client Secret"}
-              className="pr-10"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-              onClick={() => setShowSecret(!showSecret)}
-            >
-              {showSecret ? (
-                <EyeOff className="w-4 h-4 text-muted-foreground" />
-              ) : (
-                <Eye className="w-4 h-4 text-muted-foreground" />
-              )}
-            </Button>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="tenantId">Tenant ID</Label>
-          <Input
-            id="tenantId"
-            value={tenantId}
-            onChange={(e) => setTenantId(e.target.value)}
-            placeholder="Enter your CartonCloud Tenant ID (UUID)"
-          />
-          <p className="text-xs text-muted-foreground">
-            You can find your Tenant ID in CartonCloud under Settings → API Clients
-          </p>
-        </div>
 
         {connectionStatus === 'error' && (
           <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
@@ -220,51 +288,81 @@ export function CartonCloudIntegration() {
         )}
 
         <div className="flex items-center gap-3 pt-4">
-          <Button
-            onClick={handleTestConnection}
-            variant="outline"
-            disabled={
-              testConnection.isPending || 
-              testSavedConnection.isPending || 
-              (!settings && (!clientId || !clientSecret || !tenantId))
-            }
-          >
-            {(testConnection.isPending || testSavedConnection.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Test Connection
-          </Button>
+          {hasCredentialsSaved && !isEditingCredentials ? (
+            <>
+              {/* Actions when viewing saved credentials */}
+              <Button
+                onClick={handleTestConnection}
+                variant="outline"
+                disabled={testSavedConnection.isPending}
+              >
+                {testSavedConnection.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Test Connection
+              </Button>
 
-          <Button
-            onClick={handleSave}
-            disabled={saveSettings.isPending || !clientId || !clientSecret || !tenantId}
-            className="bg-accent text-accent-foreground hover:bg-accent/90"
-          >
-            {saveSettings.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Save Settings
-          </Button>
+              <Button
+                onClick={handleStartEditing}
+                variant="secondary"
+              >
+                Update Credentials
+              </Button>
 
-          {isConnected && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm">
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Disconnect
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Disconnect CartonCloud?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will remove your CartonCloud credentials. You won't be able to search for Purchase Orders until you reconnect.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDisconnect}>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <Trash2 className="w-4 h-4 mr-2" />
                     Disconnect
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Disconnect CartonCloud?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will remove your CartonCloud credentials. You won't be able to search for Purchase Orders until you reconnect.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDisconnect}>
+                      Disconnect
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          ) : (
+            <>
+              {/* Actions when editing or adding new credentials */}
+              <Button
+                onClick={handleTestConnection}
+                variant="outline"
+                disabled={
+                  testConnection.isPending || 
+                  !clientId || !clientSecret || !tenantId
+                }
+              >
+                {testConnection.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Test Connection
+              </Button>
+
+              <Button
+                onClick={handleSave}
+                disabled={saveSettings.isPending || !clientId || !clientSecret || !tenantId}
+                className="bg-accent text-accent-foreground hover:bg-accent/90"
+              >
+                {saveSettings.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Save Settings
+              </Button>
+
+              {isEditingCredentials && (
+                <Button
+                  onClick={handleCancelEditing}
+                  variant="ghost"
+                >
+                  Cancel
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>
