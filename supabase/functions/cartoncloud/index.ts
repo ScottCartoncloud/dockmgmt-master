@@ -73,7 +73,7 @@ async function getEncryptionKey(): Promise<CryptoKey> {
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: encoder.encode('cartoncloud-credentials-v1'),
+      salt: encoder.encode('cartoncloud-credentials-v2'),
       iterations: 100000,
       hash: 'SHA-256',
     },
