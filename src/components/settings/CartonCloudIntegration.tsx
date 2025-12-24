@@ -96,6 +96,11 @@ export function CartonCloudIntegration() {
         client_secret: clientSecret,
         cartoncloud_tenant_id: tenantId,
       });
+      // Clear credential fields after successful save for security
+      setClientId('');
+      setClientSecret('');
+      setShowSecret(false);
+      setConnectionStatus('success');
       toast.success('CartonCloud settings saved successfully');
     } catch (error) {
       console.error('Save settings error:', error);
