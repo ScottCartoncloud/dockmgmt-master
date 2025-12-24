@@ -48,11 +48,15 @@ const saveCredentialsSchema = z.object({
   client_id: z.string().min(1).max(500),
   client_secret: z.string().min(1).max(500),
   cartoncloud_tenant_id: z.string().min(1).max(100),
+  // Target app tenant to save settings for (used by super users / tenant switching)
+  appTenantId: z.string().uuid().optional(),
 }).strict();
 
 const deleteCredentialsSchema = z.object({
   action: z.literal('delete'),
   settings_id: z.string().uuid(),
+  // Target app tenant to delete settings from (used by super users / tenant switching)
+  appTenantId: z.string().uuid().optional(),
 }).strict();
 
 // Encryption utilities using Web Crypto API
@@ -165,20 +169,46 @@ serve(async (req) => {
       );
     }
 
+    const rawBody = await req.json();
+    const action = rawBody?.action;
+
+    console.log('[cartoncloud-credentials] request', JSON.stringify({
+      action,
+      userId: user.id,
+      appTenantId: rawBody?.appTenantId ?? null,
+    }));
+
     // Get user's tenant and roles
-    const { data: profile } = await supabaseClient
+    const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select('tenant_id')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
-    const { data: roles } = await supabaseClient
+    if (profileError) {
+      console.error('Error fetching profile:', profileError.message);
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch user profile' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: roles, error: rolesError } = await supabaseClient
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id);
 
+    if (rolesError) {
+      console.error('Error fetching roles:', rolesError.message);
+      return new Response(
+        JSON.stringify({ error: 'Failed to verify user permissions' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const userRoles = roles?.map((r: { role: string }) => r.role) || [];
-    const isAuthorized = userRoles.includes('admin') || userRoles.includes('super_user');
+    const isSuperUser = userRoles.includes('super_user');
+    const isAuthorized = userRoles.includes('admin') || isSuperUser;
 
     if (!isAuthorized) {
       return new Response(
@@ -187,9 +217,18 @@ serve(async (req) => {
       );
     }
 
-    const userTenantId = profile?.tenant_id;
-    const rawBody = await req.json();
-    const action = rawBody.action;
+    const userTenantId = profile?.tenant_id ?? null;
+    const requestedTenantId =
+      typeof rawBody?.appTenantId === 'string' ? rawBody.appTenantId : null;
+
+    if (requestedTenantId && !isSuperUser && userTenantId !== requestedTenantId) {
+      return new Response(
+        JSON.stringify({ error: 'Insufficient permissions for selected tenant' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const effectiveTenantId = requestedTenantId && isSuperUser ? requestedTenantId : userTenantId;
 
     if (action === 'save') {
       const parseResult = saveCredentialsSchema.safeParse(rawBody);
@@ -202,14 +241,14 @@ serve(async (req) => {
 
       const { client_id, client_secret, cartoncloud_tenant_id } = parseResult.data;
 
-      if (!userTenantId) {
+      if (!effectiveTenantId) {
         return new Response(
-          JSON.stringify({ error: 'No tenant assigned to user' }),
+          JSON.stringify({ error: 'No tenant selected for saving settings' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      logAudit('CARTONCLOUD_CREDENTIALS_SAVE', user.id, userTenantId, {
+      logAudit('CARTONCLOUD_CREDENTIALS_SAVE', user.id, effectiveTenantId, {
         cartoncloud_tenant_id,
       });
 
@@ -221,7 +260,7 @@ serve(async (req) => {
       const { data: existing } = await supabaseServiceClient
         .from('cartoncloud_settings')
         .select('id')
-        .eq('tenant_id', userTenantId)
+        .eq('tenant_id', effectiveTenantId)
         .maybeSingle();
 
       let result;
@@ -247,7 +286,7 @@ serve(async (req) => {
             client_id: encryptedClientId,
             client_secret: encryptedClientSecret,
             cartoncloud_tenant_id: cartoncloud_tenant_id,
-            tenant_id: userTenantId,
+            tenant_id: effectiveTenantId,
             is_active: true,
           })
           .select('id, cartoncloud_tenant_id, tenant_id, is_active, created_at, updated_at')
@@ -257,7 +296,7 @@ serve(async (req) => {
         result = data;
       }
 
-      console.log('Credentials saved (encrypted) for tenant:', userTenantId);
+      console.log('Credentials saved (encrypted) for tenant:', effectiveTenantId);
 
       return new Response(
         JSON.stringify({ success: true, data: result }),
@@ -276,7 +315,37 @@ serve(async (req) => {
 
       const { settings_id } = parseResult.data;
 
-      logAudit('CARTONCLOUD_CREDENTIALS_DELETE', user.id, userTenantId, {
+      if (!effectiveTenantId) {
+        return new Response(
+          JSON.stringify({ error: 'No tenant selected' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Confirm the settings belongs to the target tenant
+      const { data: existingSetting, error: existingError } = await supabaseServiceClient
+        .from('cartoncloud_settings')
+        .select('id, tenant_id')
+        .eq('id', settings_id)
+        .maybeSingle();
+
+      if (existingError) throw existingError;
+
+      if (!existingSetting) {
+        return new Response(
+          JSON.stringify({ error: 'Settings not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (existingSetting.tenant_id !== effectiveTenantId) {
+        return new Response(
+          JSON.stringify({ error: 'Insufficient permissions for selected tenant' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      logAudit('CARTONCLOUD_CREDENTIALS_DELETE', user.id, effectiveTenantId, {
         settings_id,
       });
 

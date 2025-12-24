@@ -2,6 +2,21 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantContext } from '@/hooks/useTenantContext';
 
+async function getEdgeFunctionErrorMessage(err: unknown): Promise<string | null> {
+  const anyErr = err as any;
+  const response: Response | undefined = anyErr?.context;
+  if (!response) return null;
+
+  try {
+    const json = await response.clone().json();
+    if (json?.error && typeof json.error === 'string') return json.error;
+    if (json?.message && typeof json.message === 'string') return json.message;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // NOTE: CartonCloud credentials (client_id, client_secret) are ENCRYPTED in the database
 // and NEVER exposed to client. They are only decrypted server-side in edge functions.
 export interface CartonCloudSettings {
@@ -59,16 +74,20 @@ export function useSaveCartonCloudSettings() {
       const { data, error } = await supabase.functions.invoke('cartoncloud-credentials', {
         body: {
           action: 'save',
+          appTenantId: activeTenant.id,
           client_id: settings.client_id,
           client_secret: settings.client_secret,
           cartoncloud_tenant_id: settings.cartoncloud_tenant_id,
         },
       });
 
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-      
-      return data.data;
+      if (error) {
+        const detailed = await getEdgeFunctionErrorMessage(error);
+        throw new Error(detailed ?? error.message);
+      }
+      if (data?.error) throw new Error(data.error);
+
+      return data?.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cartoncloud-settings'] });
@@ -81,16 +100,24 @@ export function useDeleteCartonCloudSettings() {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      if (!activeTenant?.id) {
+        throw new Error('No active tenant selected');
+      }
+
       // Use edge function to delete credentials securely
       const { data, error } = await supabase.functions.invoke('cartoncloud-credentials', {
         body: {
           action: 'delete',
+          appTenantId: activeTenant.id,
           settings_id: id,
         },
       });
 
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      if (error) {
+        const detailed = await getEdgeFunctionErrorMessage(error);
+        throw new Error(detailed ?? error.message);
+      }
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cartoncloud-settings'] });
@@ -109,16 +136,25 @@ export interface CartonCloudOrder {
 }
 
 export function useSearchCartonCloudOrders() {
+  const { activeTenant } = useTenantContext();
+
   return useMutation({
     mutationFn: async (searchTerm: string): Promise<CartonCloudOrder[]> => {
+      if (!activeTenant?.id) {
+        throw new Error('No active tenant selected');
+      }
+
       const { data, error } = await supabase.functions.invoke('cartoncloud', {
-        body: { action: 'search-orders', searchTerm },
+        body: { action: 'search-orders', searchTerm, appTenantId: activeTenant.id },
       });
 
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-      
-      return data.orders || [];
+      if (error) {
+        const detailed = await getEdgeFunctionErrorMessage(error);
+        throw new Error(detailed ?? error.message);
+      }
+      if (data?.error) throw new Error(data.error);
+
+      return data?.orders || [];
     },
   });
 }
@@ -127,7 +163,7 @@ export function useTestCartonCloudConnection() {
   return useMutation({
     mutationFn: async (credentials: { clientId: string; clientSecret: string; tenantId: string }) => {
       const { data, error } = await supabase.functions.invoke('cartoncloud', {
-        body: { 
+        body: {
           action: 'test-connection',
           clientId: credentials.clientId,
           clientSecret: credentials.clientSecret,
@@ -135,20 +171,32 @@ export function useTestCartonCloudConnection() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        const detailed = await getEdgeFunctionErrorMessage(error);
+        throw new Error(detailed ?? error.message);
+      }
       return data;
     },
   });
 }
 
 export function useTestSavedCartonCloudConnection() {
+  const { activeTenant } = useTenantContext();
+
   return useMutation({
     mutationFn: async () => {
+      if (!activeTenant?.id) {
+        throw new Error('No active tenant selected');
+      }
+
       const { data, error } = await supabase.functions.invoke('cartoncloud', {
-        body: { action: 'test-saved-connection' },
+        body: { action: 'test-saved-connection', appTenantId: activeTenant.id },
       });
 
-      if (error) throw error;
+      if (error) {
+        const detailed = await getEdgeFunctionErrorMessage(error);
+        throw new Error(detailed ?? error.message);
+      }
       return data;
     },
   });
