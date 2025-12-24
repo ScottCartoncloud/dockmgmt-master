@@ -97,6 +97,7 @@ export function useSaveCartonCloudSettings() {
 
 export function useDeleteCartonCloudSettings() {
   const queryClient = useQueryClient();
+  const { activeTenant } = useTenantContext();
 
   return useMutation({
     mutationFn: async (id: string) => {
