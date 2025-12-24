@@ -94,7 +94,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
-          const found = tenants.find(t => t.id === parsed.id);
+          const found = tenants.find((t) => t.id === parsed.id);
           if (found) {
             setActiveTenantState(found);
             return;
@@ -113,7 +113,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        const found = tenants.find(t => t.id === parsed.id);
+        const found = tenants.find((t) => t.id === parsed.id);
         if (found) {
           setActiveTenantState(found);
           return;
@@ -123,9 +123,19 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    // If user is a super user and stored tenant is missing/invalid, pick a sensible default.
+    // This prevents the app from getting stuck with `activeTenant = null` (which disables many queries).
+    if (isSuperUser && tenants.length > 0) {
+      const defaultTenant =
+        tenants.find((t) => t.id === '00000000-0000-0000-0000-000000000001') ?? tenants[0];
+      setActiveTenantState(defaultTenant);
+      localStorage.setItem(ACTIVE_TENANT_KEY, JSON.stringify(defaultTenant));
+      return;
+    }
+
     // Default to user's tenant or single tenant
     if (!isSuperUser && profile?.tenant_id) {
-      const userTenant = tenants.find(t => t.id === profile.tenant_id);
+      const userTenant = tenants.find((t) => t.id === profile.tenant_id);
       if (userTenant) {
         setActiveTenantState(userTenant);
         localStorage.setItem(ACTIVE_TENANT_KEY, JSON.stringify(userTenant));
