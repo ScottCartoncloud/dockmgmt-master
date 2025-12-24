@@ -6,24 +6,11 @@ const CARTONCLOUD_API_BASE = 'https://api.cartoncloud.com';
 const ENCRYPTION_KEY = Deno.env.get('CREDENTIALS_ENCRYPTION_KEY');
 const APP_BASE_URL = Deno.env.get("APP_BASE_URL") ?? "";
 
-// CORS configuration - restrict to allowed origins
-const ALLOWED_ORIGINS = [
-  "http://localhost:5173",
-  "http://localhost:8080",
-  APP_BASE_URL,
-].filter(Boolean);
-
-function getCorsHeaders(origin: string | null): Record<string, string> {
-  const allowedOrigin = origin && ALLOWED_ORIGINS.some(allowed => 
-    origin === allowed || origin.endsWith('.lovableproject.com')
-  ) ? origin : ALLOWED_ORIGINS[0] || "*";
-  
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Credentials": "true",
-  };
-}
+// CORS configuration - allow all origins for flexibility with preview domains
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 // Simple in-memory rate limiter
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -302,9 +289,6 @@ async function validateUserAuthorization(
 }
 
 serve(async (req) => {
-  const origin = req.headers.get("origin");
-  const corsHeaders = getCorsHeaders(origin);
-  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
