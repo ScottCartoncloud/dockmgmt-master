@@ -2,9 +2,47 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const CARTONCLOUD_API_BASE = 'https://api.cartoncloud.com';
+// Default API base URL - can be overridden per-tenant
+const DEFAULT_CARTONCLOUD_API_BASE = 'https://api.cartoncloud.com';
+
+// Allowed CartonCloud API hostnames for validation
+const ALLOWED_API_HOSTS = [
+  'api.cartoncloud.com',
+  'api.na.cartoncloud.com',
+];
+
 const ENCRYPTION_KEY = Deno.env.get('CREDENTIALS_ENCRYPTION_KEY');
 const APP_BASE_URL = Deno.env.get("APP_BASE_URL") ?? "";
+
+// Validate and normalize API base URL
+function validateApiBaseUrl(url: string | null | undefined, isSuperUser: boolean): string {
+  if (!url) return DEFAULT_CARTONCLOUD_API_BASE;
+  
+  try {
+    const parsed = new URL(url);
+    
+    // Must be HTTPS
+    if (parsed.protocol !== 'https:') {
+      console.warn('API base URL must use HTTPS, falling back to default');
+      return DEFAULT_CARTONCLOUD_API_BASE;
+    }
+    
+    // Check against allowlist
+    const isAllowed = ALLOWED_API_HOSTS.includes(parsed.hostname);
+    
+    // Super users can use custom URLs that match a valid pattern
+    if (!isAllowed && !isSuperUser) {
+      console.warn('API base URL not in allowlist and user is not super user, falling back to default');
+      return DEFAULT_CARTONCLOUD_API_BASE;
+    }
+    
+    // Normalize: return origin only (no path/query)
+    return parsed.origin;
+  } catch {
+    console.warn('Invalid API base URL, falling back to default');
+    return DEFAULT_CARTONCLOUD_API_BASE;
+  }
+}
 
 // CORS configuration - allow all origins for flexibility with preview domains
 const corsHeaders = {
@@ -114,20 +152,27 @@ function isEncrypted(value: string): boolean {
   }
 }
 
-async function getAccessToken(clientId: string, clientSecret: string, tenantId: string): Promise<string> {
-  if (tokenCache && tokenCache.tenantId === tenantId && Date.now() < tokenCache.expiresAt - 60000) {
+async function getAccessToken(
+  clientId: string, 
+  clientSecret: string, 
+  tenantId: string,
+  apiBaseUrl: string = DEFAULT_CARTONCLOUD_API_BASE
+): Promise<string> {
+  // Include apiBaseUrl in cache key to avoid mixing tokens across different API endpoints
+  const cacheKey = `${tenantId}:${apiBaseUrl}`;
+  if (tokenCache && tokenCache.tenantId === cacheKey && Date.now() < tokenCache.expiresAt - 60000) {
     console.log('Using cached access token');
     return tokenCache.accessToken;
   }
 
-  console.log('Fetching new access token from CartonCloud');
+  console.log('Fetching new access token from CartonCloud at:', apiBaseUrl);
   const credentials = btoa(`${clientId}:${clientSecret}`);
   
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
   
   try {
-    const response = await fetch(`${CARTONCLOUD_API_BASE}/uaa/oauth/token`, {
+    const response = await fetch(`${apiBaseUrl}/uaa/oauth/token`, {
       method: 'POST',
       headers: {
         'Authorization': `Basic ${credentials}`,
@@ -150,7 +195,7 @@ async function getAccessToken(clientId: string, clientSecret: string, tenantId: 
     tokenCache = {
       accessToken: data.access_token,
       expiresAt: Date.now() + (data.expires_in * 1000),
-      tenantId,
+      tenantId: cacheKey,
     };
 
     return data.access_token;
@@ -162,9 +207,10 @@ async function getAccessToken(clientId: string, clientSecret: string, tenantId: 
 async function searchInboundOrders(
   accessToken: string,
   tenantId: string,
-  searchTerm: string
+  searchTerm: string,
+  apiBaseUrl: string = DEFAULT_CARTONCLOUD_API_BASE
 ): Promise<any[]> {
-  console.log('Searching inbound orders for:', searchTerm);
+  console.log('Searching inbound orders for:', searchTerm, 'at:', apiBaseUrl);
   
   const searchPayload = {
     condition: {
@@ -191,7 +237,7 @@ async function searchInboundOrders(
   
   try {
     const response = await fetch(
-      `${CARTONCLOUD_API_BASE}/tenants/${tenantId}/inbound-orders/search`,
+      `${apiBaseUrl}/tenants/${tenantId}/inbound-orders/search`,
       {
         method: 'POST',
         headers: {
@@ -221,16 +267,17 @@ async function searchInboundOrders(
 async function testConnection(
   clientId: string,
   clientSecret: string,
-  tenantId: string
+  tenantId: string,
+  apiBaseUrl: string = DEFAULT_CARTONCLOUD_API_BASE
 ): Promise<{ success: boolean; message: string; userInfo?: any }> {
   try {
-    const accessToken = await getAccessToken(clientId, clientSecret, tenantId);
+    const accessToken = await getAccessToken(clientId, clientSecret, tenantId, apiBaseUrl);
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     
     try {
-      const response = await fetch(`${CARTONCLOUD_API_BASE}/uaa/userinfo`, {
+      const response = await fetch(`${apiBaseUrl}/uaa/userinfo`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Accept-Version': '1',
@@ -382,7 +429,7 @@ serve(async (req) => {
        );
      }
 
-     const { action, searchTerm, clientId, clientSecret, tenantId, appTenantId } = rawBody;
+     const { action, searchTerm, clientId, clientSecret, tenantId, appTenantId, apiBaseUrl } = rawBody;
      console.log('CartonCloud function called with action:', action);
 
      const requestedTenantId = typeof appTenantId === 'string' ? appTenantId : null;
@@ -419,17 +466,22 @@ serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+
+      // Validate and use provided API base URL
+      const validatedApiBaseUrl = validateApiBaseUrl(apiBaseUrl, !!authz.isSuperUser);
       
       logAudit('CARTONCLOUD_TEST_CONNECTION', user.id, userTenantId, { 
         success: 'pending',
-        cartoncloudTenantId: tenantId 
+        cartoncloudTenantId: tenantId,
+        apiBaseUrl: validatedApiBaseUrl,
       });
       
-      const result = await testConnection(clientId, clientSecret, tenantId);
+      const result = await testConnection(clientId, clientSecret, tenantId, validatedApiBaseUrl);
       
       logAudit('CARTONCLOUD_TEST_CONNECTION_RESULT', user.id, userTenantId, { 
         success: result.success,
-        cartoncloudTenantId: tenantId 
+        cartoncloudTenantId: tenantId,
+        apiBaseUrl: validatedApiBaseUrl,
       });
       
       return new Response(JSON.stringify(result), {
@@ -486,16 +538,21 @@ serve(async (req) => {
         }
       }
 
+      // Validate API base URL from saved settings
+      const validatedApiBaseUrl = validateApiBaseUrl(savedSettings.api_base_url, !!authz.isSuperUser);
+
       logAudit('CARTONCLOUD_TEST_SAVED_CONNECTION', user.id, userTenantId, { 
         settingsId: savedSettings.id,
-        cartoncloudTenantId: savedSettings.cartoncloud_tenant_id 
+        cartoncloudTenantId: savedSettings.cartoncloud_tenant_id,
+        apiBaseUrl: validatedApiBaseUrl,
       });
 
-      const result = await testConnection(decClientId, decClientSecret, savedSettings.cartoncloud_tenant_id);
+      const result = await testConnection(decClientId, decClientSecret, savedSettings.cartoncloud_tenant_id, validatedApiBaseUrl);
       
       logAudit('CARTONCLOUD_TEST_SAVED_CONNECTION_RESULT', user.id, userTenantId, { 
         success: result.success,
         settingsId: savedSettings.id,
+        apiBaseUrl: validatedApiBaseUrl,
       });
 
       return new Response(JSON.stringify(result), {
@@ -557,10 +614,14 @@ serve(async (req) => {
       }
     }
 
+    // Validate API base URL from saved settings
+    const validatedApiBaseUrl = validateApiBaseUrl(settings.api_base_url, !!authz.isSuperUser);
+
     const accessToken = await getAccessToken(
       decryptedClientId, 
       decryptedClientSecret,
-      settings.cartoncloud_tenant_id
+      settings.cartoncloud_tenant_id,
+      validatedApiBaseUrl
     );
 
     if (action === 'search-orders') {
@@ -578,7 +639,12 @@ serve(async (req) => {
         );
       }
 
-      const orders = await searchInboundOrders(accessToken, settings.cartoncloud_tenant_id, searchTerm);
+      const orders = await searchInboundOrders(
+        accessToken, 
+        settings.cartoncloud_tenant_id, 
+        searchTerm,
+        validatedApiBaseUrl
+      );
       
       const formattedOrders = orders.map((order: any) => ({
         id: order.id,
