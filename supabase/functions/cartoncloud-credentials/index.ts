@@ -42,12 +42,56 @@ function isRateLimited(key: string): boolean {
   return false;
 }
 
+// Allowed CartonCloud API hostnames for validation
+const ALLOWED_API_HOSTS = [
+  'api.cartoncloud.com',
+  'api.na.cartoncloud.com',
+];
+
+const DEFAULT_API_BASE_URL = 'https://api.cartoncloud.com';
+
+// Validate and normalize API base URL
+function validateApiBaseUrl(url: string | null | undefined, isSuperUser: boolean): { valid: boolean; normalized: string; error?: string } {
+  if (!url) return { valid: true, normalized: DEFAULT_API_BASE_URL };
+  
+  try {
+    const parsed = new URL(url);
+    
+    // Must be HTTPS
+    if (parsed.protocol !== 'https:') {
+      return { valid: false, normalized: DEFAULT_API_BASE_URL, error: 'API base URL must use HTTPS' };
+    }
+    
+    // Check against allowlist
+    const isAllowed = ALLOWED_API_HOSTS.includes(parsed.hostname);
+    
+    // Super users can use custom URLs that match a valid pattern
+    if (!isAllowed && !isSuperUser) {
+      return { valid: false, normalized: DEFAULT_API_BASE_URL, error: 'Custom API URLs are only allowed for super users' };
+    }
+    
+    // For non-super users, must be in allowlist
+    if (!isAllowed && isSuperUser) {
+      // Validate it looks like a valid CartonCloud-like domain
+      if (!parsed.hostname.match(/^[a-zA-Z0-9][a-zA-Z0-9\-\.]*\.[a-zA-Z]{2,}$/)) {
+        return { valid: false, normalized: DEFAULT_API_BASE_URL, error: 'Invalid custom API URL format' };
+      }
+    }
+    
+    // Normalize: return origin only (no path/query)
+    return { valid: true, normalized: parsed.origin };
+  } catch {
+    return { valid: false, normalized: DEFAULT_API_BASE_URL, error: 'Invalid API base URL format' };
+  }
+}
+
 // Zod schemas for input validation
 const saveCredentialsSchema = z.object({
   action: z.literal('save'),
   client_id: z.string().min(1).max(500),
   client_secret: z.string().min(1).max(500),
   cartoncloud_tenant_id: z.string().min(1).max(100),
+  api_base_url: z.string().url().optional(),
   // Target app tenant to save settings for (used by super users / tenant switching)
   appTenantId: z.string().uuid().optional(),
 }).strict();
@@ -239,7 +283,7 @@ serve(async (req) => {
         );
       }
 
-      const { client_id, client_secret, cartoncloud_tenant_id } = parseResult.data;
+      const { client_id, client_secret, cartoncloud_tenant_id, api_base_url } = parseResult.data;
 
       if (!effectiveTenantId) {
         return new Response(
@@ -248,8 +292,18 @@ serve(async (req) => {
         );
       }
 
+      // Validate API base URL
+      const apiUrlValidation = validateApiBaseUrl(api_base_url, isSuperUser);
+      if (!apiUrlValidation.valid) {
+        return new Response(
+          JSON.stringify({ error: apiUrlValidation.error }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       logAudit('CARTONCLOUD_CREDENTIALS_SAVE', user.id, effectiveTenantId, {
         cartoncloud_tenant_id,
+        api_base_url: apiUrlValidation.normalized,
       });
 
       // Encrypt credentials
@@ -271,10 +325,11 @@ serve(async (req) => {
             client_id: encryptedClientId,
             client_secret: encryptedClientSecret,
             cartoncloud_tenant_id: cartoncloud_tenant_id,
+            api_base_url: apiUrlValidation.normalized,
             is_active: true,
           })
           .eq('id', existing.id)
-          .select('id, cartoncloud_tenant_id, tenant_id, is_active, created_at, updated_at')
+          .select('id, cartoncloud_tenant_id, api_base_url, tenant_id, is_active, created_at, updated_at')
           .single();
 
         if (error) throw error;
@@ -286,17 +341,18 @@ serve(async (req) => {
             client_id: encryptedClientId,
             client_secret: encryptedClientSecret,
             cartoncloud_tenant_id: cartoncloud_tenant_id,
+            api_base_url: apiUrlValidation.normalized,
             tenant_id: effectiveTenantId,
             is_active: true,
           })
-          .select('id, cartoncloud_tenant_id, tenant_id, is_active, created_at, updated_at')
+          .select('id, cartoncloud_tenant_id, api_base_url, tenant_id, is_active, created_at, updated_at')
           .single();
 
         if (error) throw error;
         result = data;
       }
 
-      console.log('Credentials saved (encrypted) for tenant:', effectiveTenantId);
+      console.log('Credentials saved (encrypted) for tenant:', effectiveTenantId, 'with API base:', apiUrlValidation.normalized);
 
       return new Response(
         JSON.stringify({ success: true, data: result }),

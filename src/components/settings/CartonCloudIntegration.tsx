@@ -5,6 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -22,7 +29,12 @@ import {
   useDeleteCartonCloudSettings,
   useTestCartonCloudConnection,
   useTestSavedCartonCloudConnection,
+  CARTONCLOUD_API_ENDPOINTS,
+  DEFAULT_API_BASE_URL,
 } from '@/hooks/useCartonCloudSettings';
+import { useAuth } from '@/hooks/useAuth';
+
+const CUSTOM_OPTION_VALUE = '__custom__';
 
 export function CartonCloudIntegration() {
   const { data: settings, isLoading } = useCartonCloudSettings();
@@ -30,10 +42,14 @@ export function CartonCloudIntegration() {
   const deleteSettings = useDeleteCartonCloudSettings();
   const testConnection = useTestCartonCloudConnection();
   const testSavedConnection = useTestSavedCartonCloudConnection();
+  const { isSuperUser } = useAuth();
 
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
   const [tenantId, setTenantId] = useState('');
+  const [apiBaseUrl, setApiBaseUrl] = useState(DEFAULT_API_BASE_URL);
+  const [customApiUrl, setCustomApiUrl] = useState('');
+  const [isCustomUrl, setIsCustomUrl] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [isEditingCredentials, setIsEditingCredentials] = useState(false);
@@ -41,12 +57,30 @@ export function CartonCloudIntegration() {
   // Masked placeholder to show credentials are saved
   const MASKED_VALUE = '••••••••••••••••';
 
+  // Check if a URL is in the standard endpoints list
+  const isStandardEndpoint = (url: string) => {
+    return CARTONCLOUD_API_ENDPOINTS.some(ep => ep.value === url);
+  };
+
   // NOTE: Credentials (client_id, client_secret) are never exposed to the client for security.
   // When settings exist, we only get metadata. User must re-enter credentials to update.
   useEffect(() => {
     if (settings) {
-      // Only set tenant ID which is non-sensitive
+      // Only set tenant ID and API base URL which are non-sensitive
       setTenantId(settings.cartoncloud_tenant_id);
+      
+      const savedUrl = settings.api_base_url || DEFAULT_API_BASE_URL;
+      if (isStandardEndpoint(savedUrl)) {
+        setApiBaseUrl(savedUrl);
+        setIsCustomUrl(false);
+        setCustomApiUrl('');
+      } else {
+        // Custom URL - only super users should see this
+        setApiBaseUrl(CUSTOM_OPTION_VALUE);
+        setIsCustomUrl(true);
+        setCustomApiUrl(savedUrl);
+      }
+      
       setConnectionStatus('success');
       // Clear credential fields - they're stored securely but never returned
       setClientId('');
@@ -56,6 +90,25 @@ export function CartonCloudIntegration() {
   }, [settings]);
 
   const hasCredentialsSaved = !!settings?.has_credentials;
+
+  // Get the effective API base URL for operations
+  const getEffectiveApiBaseUrl = () => {
+    if (isCustomUrl && customApiUrl) {
+      return customApiUrl;
+    }
+    return apiBaseUrl === CUSTOM_OPTION_VALUE ? DEFAULT_API_BASE_URL : apiBaseUrl;
+  };
+
+  const handleApiEndpointChange = (value: string) => {
+    if (value === CUSTOM_OPTION_VALUE) {
+      setIsCustomUrl(true);
+      setApiBaseUrl(value);
+    } else {
+      setIsCustomUrl(false);
+      setCustomApiUrl('');
+      setApiBaseUrl(value);
+    }
+  };
 
   const handleTestConnection = async () => {
     setConnectionStatus('idle');
@@ -72,6 +125,7 @@ export function CartonCloudIntegration() {
           clientId,
           clientSecret,
           tenantId,
+          apiBaseUrl: getEffectiveApiBaseUrl(),
         });
       } else {
         toast.error('Please fill in all fields or test existing connection');
@@ -97,11 +151,28 @@ export function CartonCloudIntegration() {
       return;
     }
 
+    const effectiveApiUrl = getEffectiveApiBaseUrl();
+
+    // Validate custom URL format
+    if (isCustomUrl) {
+      try {
+        const parsed = new URL(effectiveApiUrl);
+        if (parsed.protocol !== 'https:') {
+          toast.error('Custom API URL must use HTTPS');
+          return;
+        }
+      } catch {
+        toast.error('Invalid custom API URL format');
+        return;
+      }
+    }
+
     try {
       await saveSettings.mutateAsync({
         client_id: clientId,
         client_secret: clientSecret,
         cartoncloud_tenant_id: tenantId,
+        api_base_url: effectiveApiUrl,
       });
       // Clear credential fields after successful save for security
       setClientId('');
@@ -127,6 +198,19 @@ export function CartonCloudIntegration() {
     setIsEditingCredentials(false);
     setClientId('');
     setClientSecret('');
+    // Reset API URL to saved value
+    if (settings) {
+      const savedUrl = settings.api_base_url || DEFAULT_API_BASE_URL;
+      if (isStandardEndpoint(savedUrl)) {
+        setApiBaseUrl(savedUrl);
+        setIsCustomUrl(false);
+        setCustomApiUrl('');
+      } else {
+        setApiBaseUrl(CUSTOM_OPTION_VALUE);
+        setIsCustomUrl(true);
+        setCustomApiUrl(savedUrl);
+      }
+    }
   };
 
   const handleDisconnect = async () => {
@@ -137,6 +221,9 @@ export function CartonCloudIntegration() {
       setClientId('');
       setClientSecret('');
       setTenantId('');
+      setApiBaseUrl(DEFAULT_API_BASE_URL);
+      setCustomApiUrl('');
+      setIsCustomUrl(false);
       setConnectionStatus('idle');
       toast.success('CartonCloud integration disconnected');
     } catch (error) {
@@ -153,6 +240,15 @@ export function CartonCloudIntegration() {
   }
 
   const isConnected = settings && connectionStatus === 'success';
+
+  // Get the display value for the current API endpoint
+  const getApiEndpointDisplayValue = () => {
+    if (isCustomUrl) {
+      return customApiUrl || 'Custom URL';
+    }
+    const endpoint = CARTONCLOUD_API_ENDPOINTS.find(ep => ep.value === apiBaseUrl);
+    return endpoint?.label || apiBaseUrl;
+  };
 
   return (
     <div className="space-y-6">
@@ -208,6 +304,19 @@ export function CartonCloudIntegration() {
               />
               <p className="text-xs text-muted-foreground">
                 You can find your Tenant ID in CartonCloud under Settings → API Clients
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="apiEndpoint">API Endpoint</Label>
+              <Input
+                id="apiEndpoint"
+                value={getApiEndpointDisplayValue()}
+                disabled
+                className="bg-muted/50"
+              />
+              <p className="text-xs text-muted-foreground">
+                The CartonCloud API endpoint for your region
               </p>
             </div>
 
@@ -277,6 +386,45 @@ export function CartonCloudIntegration() {
                 You can find your Tenant ID in CartonCloud under Settings → API Clients
               </p>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="apiEndpoint">API Endpoint</Label>
+              <Select value={apiBaseUrl} onValueChange={handleApiEndpointChange}>
+                <SelectTrigger id="apiEndpoint">
+                  <SelectValue placeholder="Select API endpoint" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CARTONCLOUD_API_ENDPOINTS.map((endpoint) => (
+                    <SelectItem key={endpoint.value} value={endpoint.value}>
+                      {endpoint.label}
+                    </SelectItem>
+                  ))}
+                  {isSuperUser && (
+                    <SelectItem value={CUSTOM_OPTION_VALUE}>
+                      Custom (Super User only)
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Select the CartonCloud API endpoint for your region. Most tenants use the default endpoint.
+              </p>
+            </div>
+
+            {isCustomUrl && isSuperUser && (
+              <div className="space-y-2">
+                <Label htmlFor="customApiUrl">Custom API URL</Label>
+                <Input
+                  id="customApiUrl"
+                  value={customApiUrl}
+                  onChange={(e) => setCustomApiUrl(e.target.value)}
+                  placeholder="https://api.custom.cartoncloud.com"
+                />
+                <p className="text-xs text-muted-foreground text-amber-600">
+                  ⚠️ Custom URLs are for special cases only. Ensure the URL is correct before saving.
+                </p>
+              </div>
+            )}
           </>
         )}
 
@@ -338,7 +486,8 @@ export function CartonCloudIntegration() {
                 variant="outline"
                 disabled={
                   testConnection.isPending || 
-                  !clientId || !clientSecret || !tenantId
+                  !clientId || !clientSecret || !tenantId ||
+                  (isCustomUrl && !customApiUrl)
                 }
               >
                 {testConnection.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -347,7 +496,11 @@ export function CartonCloudIntegration() {
 
               <Button
                 onClick={handleSave}
-                disabled={saveSettings.isPending || !clientId || !clientSecret || !tenantId}
+                disabled={
+                  saveSettings.isPending || 
+                  !clientId || !clientSecret || !tenantId ||
+                  (isCustomUrl && !customApiUrl)
+                }
                 className="bg-accent text-accent-foreground hover:bg-accent/90"
               >
                 {saveSettings.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}

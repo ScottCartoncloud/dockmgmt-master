@@ -17,6 +17,14 @@ async function getEdgeFunctionErrorMessage(err: unknown): Promise<string | null>
   }
 }
 
+// Allowed CartonCloud API endpoints
+export const CARTONCLOUD_API_ENDPOINTS = [
+  { value: 'https://api.cartoncloud.com', label: 'api.cartoncloud.com (Default)' },
+  { value: 'https://api.na.cartoncloud.com', label: 'api.na.cartoncloud.com (North America)' },
+] as const;
+
+export const DEFAULT_API_BASE_URL = 'https://api.cartoncloud.com';
+
 // NOTE: CartonCloud credentials (client_id, client_secret) are ENCRYPTED in the database
 // and NEVER exposed to client. They are only decrypted server-side in edge functions.
 export interface CartonCloudSettings {
@@ -24,6 +32,7 @@ export interface CartonCloudSettings {
   cartoncloud_tenant_id: string;
   tenant_id: string | null;
   is_active: boolean;
+  api_base_url: string;
   created_at: string;
   updated_at: string;
   // Indicates credentials exist (for UI state) without exposing actual values
@@ -40,7 +49,7 @@ export function useCartonCloudSettings() {
       // The base table is blocked from all client access
       let query = supabase
         .from('cartoncloud_settings_safe')
-        .select('id, cartoncloud_tenant_id, tenant_id, is_active, created_at, updated_at, has_credentials');
+        .select('id, cartoncloud_tenant_id, tenant_id, is_active, api_base_url, created_at, updated_at, has_credentials');
 
       if (activeTenant?.id) {
         query = query.eq('tenant_id', activeTenant.id);
@@ -55,9 +64,16 @@ export function useCartonCloudSettings() {
       return data as CartonCloudSettings;
     },
     enabled: !!activeTenant?.id,
-    // Prevent “tab switch back” from re-fetching and resetting the form UI.
+    // Prevent "tab switch back" from re-fetching and resetting the form UI.
     refetchOnWindowFocus: false,
   });
+}
+
+export interface SaveCartonCloudSettingsParams {
+  client_id: string;
+  client_secret: string;
+  cartoncloud_tenant_id: string;
+  api_base_url?: string;
 }
 
 export function useSaveCartonCloudSettings() {
@@ -65,7 +81,7 @@ export function useSaveCartonCloudSettings() {
   const { activeTenant } = useTenantContext();
 
   return useMutation({
-    mutationFn: async (settings: { client_id: string; client_secret: string; cartoncloud_tenant_id: string }) => {
+    mutationFn: async (settings: SaveCartonCloudSettingsParams) => {
       if (!activeTenant?.id) {
         throw new Error('No active tenant selected');
       }
@@ -78,6 +94,7 @@ export function useSaveCartonCloudSettings() {
           client_id: settings.client_id,
           client_secret: settings.client_secret,
           cartoncloud_tenant_id: settings.cartoncloud_tenant_id,
+          api_base_url: settings.api_base_url || DEFAULT_API_BASE_URL,
         },
       });
 
@@ -160,15 +177,23 @@ export function useSearchCartonCloudOrders() {
   });
 }
 
+export interface TestConnectionParams {
+  clientId: string;
+  clientSecret: string;
+  tenantId: string;
+  apiBaseUrl?: string;
+}
+
 export function useTestCartonCloudConnection() {
   return useMutation({
-    mutationFn: async (credentials: { clientId: string; clientSecret: string; tenantId: string }) => {
+    mutationFn: async (credentials: TestConnectionParams) => {
       const { data, error } = await supabase.functions.invoke('cartoncloud', {
         body: {
           action: 'test-connection',
           clientId: credentials.clientId,
           clientSecret: credentials.clientSecret,
           tenantId: credentials.tenantId,
+          apiBaseUrl: credentials.apiBaseUrl || DEFAULT_API_BASE_URL,
         },
       });
 

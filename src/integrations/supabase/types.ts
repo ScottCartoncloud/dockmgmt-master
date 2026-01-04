@@ -208,6 +208,7 @@ export type Database = {
       }
       cartoncloud_settings: {
         Row: {
+          api_base_url: string
           cartoncloud_tenant_id: string
           client_id: string
           client_secret: string
@@ -218,6 +219,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          api_base_url?: string
           cartoncloud_tenant_id: string
           client_id: string
           client_secret: string
@@ -228,6 +230,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          api_base_url?: string
           cartoncloud_tenant_id?: string
           client_id?: string
           client_secret?: string
@@ -539,6 +542,7 @@ export type Database = {
       }
       cartoncloud_settings_safe: {
         Row: {
+          api_base_url: string | null
           cartoncloud_tenant_id: string | null
           created_at: string | null
           has_credentials: boolean | null
@@ -548,6 +552,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          api_base_url?: string | null
           cartoncloud_tenant_id?: string | null
           created_at?: string | null
           has_credentials?: never
@@ -557,6 +562,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          api_base_url?: string | null
           cartoncloud_tenant_id?: string | null
           created_at?: string | null
           has_credentials?: never
