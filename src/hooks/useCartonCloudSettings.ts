@@ -108,6 +108,9 @@ export function useSaveCartonCloudSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cartoncloud-settings'] });
+      if (activeTenant?.id) {
+        queryClient.refetchQueries({ queryKey: ['cartoncloud-settings', activeTenant.id] });
+      }
     },
   });
 }
