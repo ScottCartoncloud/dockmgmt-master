@@ -15,24 +15,11 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const APP_BASE_URL = Deno.env.get("APP_BASE_URL") ?? "";
 
-// CORS configuration
-const ALLOWED_ORIGINS = [
-  "http://localhost:5173",
-  "http://localhost:8080",
-  APP_BASE_URL,
-].filter(Boolean);
-
-function getCorsHeaders(origin: string | null): Record<string, string> {
-  const allowedOrigin = origin && ALLOWED_ORIGINS.some(allowed => 
-    origin === allowed || origin.endsWith('.lovableproject.com')
-  ) ? origin : ALLOWED_ORIGINS[0] || "*";
-  
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Credentials": "true",
-  };
-}
+// CORS headers - allow all origins (endpoint requires auth anyway)
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 // Rate limiter
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -57,8 +44,9 @@ const bodySchema = z.object({
 }).strict();
 
 serve(async (req) => {
-  const origin = req.headers.get("origin");
-  const corsHeaders = getCorsHeaders(origin);
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
   
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
