@@ -254,6 +254,12 @@ async function searchInboundOrders(
     const results = await response.json();
     
     // Filter out ALLOCATED status client-side (API doesn't support NotCondition)
+    // Log full first result for debugging field names
+    if (results.length > 0) {
+      console.log('Sample raw API result keys:', Object.keys(results[0]));
+      console.log('Sample raw API result:', JSON.stringify(results[0], null, 2));
+    }
+    
     const filteredResults = results.filter((order: any) => {
       const status = order.status || order.Status || '';
       return status.toUpperCase() !== 'ALLOCATED';
@@ -650,12 +656,23 @@ serve(async (req) => {
       
       const formattedOrders = orders.map((order: any) => ({
         id: order.id,
-        reference: order.reference || 'N/A',
-        customerName: order.customerName || 'Unknown Customer',
+        reference: order.references?.customer || order.reference || 'N/A',
+        customer: order.customer?.name || 'Unknown Customer',
         status: order.status || 'unknown',
-        createdAt: order.createdAt,
-        expectedDeliveryDate: order.expectedDeliveryDate,
-        items: order.items || [],
+        arrivalDate: order.details?.arrivalDate || null,
+        itemCount: Array.isArray(order.items) ? order.items.length : 0,
+        warehouseName: order.warehouse?.name || 'Unknown Warehouse',
+        // Additional useful fields
+        urgent: order.details?.urgent || false,
+        instructions: order.details?.instructions || '',
+        numericId: order.references?.numericId || null,
+        items: (order.items || []).map((item: any) => ({
+          id: item.id,
+          poNumber: item.properties?.poNumber || '',
+          quantity: item.measures?.quantity || 0,
+          productName: item.details?.product?.name || 'Unknown Product',
+          unitOfMeasure: item.details?.unitOfMeasure?.name || '',
+        })),
       }));
 
       return new Response(JSON.stringify({ orders: formattedOrders }), {

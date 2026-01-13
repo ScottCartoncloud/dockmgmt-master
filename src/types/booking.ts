@@ -16,6 +16,14 @@ export interface PurchaseOrder {
   expectedDate: Date | null;
 }
 
+export interface CartonCloudPOItem {
+  id: string;
+  poNumber: string;
+  quantity: number;
+  productName: string;
+  unitOfMeasure: string;
+}
+
 export interface CartonCloudPO {
   id: string;
   reference: string;
@@ -24,6 +32,10 @@ export interface CartonCloudPO {
   arrivalDate: string | null;
   itemCount: number;
   warehouseName: string;
+  urgent?: boolean;
+  instructions?: string;
+  numericId?: string | null;
+  items?: CartonCloudPOItem[];
 }
 
 // Custom field values stored as key-value pairs
