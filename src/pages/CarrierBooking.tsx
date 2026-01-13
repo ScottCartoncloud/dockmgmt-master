@@ -76,9 +76,9 @@ const generateTimeSlotsForDay = (
   let endTime = DEFAULT_END_TIME;
   
   if (dayConfig && dayConfig.enabled) {
-    // Normalize time format (handle both HH:MM and HH:MM:SS from database)
-    startTime = dayConfig.start_time.substring(0, 5);
-    endTime = dayConfig.end_time.substring(0, 5);
+    // Times are already normalized to HH:MM format when stored in state
+    startTime = dayConfig.start_time;
+    endTime = dayConfig.end_time;
   } else if (dayConfig && !dayConfig.enabled) {
     // Day is disabled, return empty slots
     return [];
@@ -206,19 +206,34 @@ export default function CarrierBooking() {
 
       // Fetch working hours via edge function
       try {
+        console.log('Fetching working hours for booking link:', bookingLinkId);
         const { data: workingHoursData, error: workingHoursError } = await supabase.functions.invoke('carrier-working-hours', {
           body: { bookingLinkId },
         });
         
+        console.log('Working hours raw response:', { data: workingHoursData, error: workingHoursError });
+        
         if (workingHoursError) {
           console.warn('Failed to fetch working hours:', workingHoursError);
           setOrgSettings({ timezone: null, workingHours: [] });
-        } else {
-          console.log('Working hours data:', workingHoursData);
+        } else if (workingHoursData) {
+          // Normalize time format from HH:MM:SS to HH:MM
+          const normalizedWorkingHours: WorkingHoursConfig[] = (workingHoursData.workingHours || []).map((wh: { day_of_week: number; enabled: boolean; start_time: string; end_time: string }) => ({
+            day_of_week: wh.day_of_week,
+            enabled: wh.enabled,
+            start_time: wh.start_time.substring(0, 5), // "08:00:00" -> "08:00"
+            end_time: wh.end_time.substring(0, 5),     // "17:00:00" -> "17:00"
+          }));
+          
+          console.log('Normalized working hours:', normalizedWorkingHours);
+          
           setOrgSettings({
-            timezone: workingHoursData?.timezone || null,
-            workingHours: workingHoursData?.workingHours || [],
+            timezone: workingHoursData.timezone || null,
+            workingHours: normalizedWorkingHours,
           });
+        } else {
+          console.warn('No working hours data in response');
+          setOrgSettings({ timezone: null, workingHours: [] });
         }
       } catch (err) {
         console.warn('Error fetching working hours:', err);
