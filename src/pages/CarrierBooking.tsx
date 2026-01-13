@@ -167,18 +167,14 @@ export default function CarrierBooking() {
         return;
       }
 
-      // Fetch carrier, reCAPTCHA config, and working hours in parallel
-      const [carrierResult, recaptchaResult, workingHoursResult] = await Promise.all([
+      // Fetch carrier and reCAPTCHA config in parallel
+      const [carrierResult, recaptchaResult] = await Promise.all([
         supabase
           .from('carriers_public')
           .select('id, name, tenant_id, is_booking_link_enabled')
           .eq('booking_link_id', bookingLinkId)
           .maybeSingle(),
         supabase.functions.invoke('recaptcha-config'),
-        supabase.functions.invoke('carrier-working-hours', {
-          body: null,
-          headers: {},
-        }).catch(() => ({ data: null, error: 'Failed to fetch' })),
       ]);
 
       // Handle carrier
@@ -208,34 +204,21 @@ export default function CarrierBooking() {
         setRecaptchaSiteKey(recaptchaResult.data.siteKey);
       }
 
-      // Fetch working hours via edge function with query param
-      const workingHoursResponse = await supabase.functions.invoke('carrier-working-hours', {
-        body: null,
-        headers: {},
-      });
-
-      // Try fetching with the bookingLinkId as query param
+      // Fetch working hours via edge function
       try {
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/carrier-working-hours?bookingLinkId=${bookingLinkId}`,
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+        const { data: workingHoursData, error: workingHoursError } = await supabase.functions.invoke('carrier-working-hours', {
+          body: { bookingLinkId },
+        });
         
-        if (response.ok) {
-          const data = await response.json();
-          setOrgSettings({
-            timezone: data.timezone,
-            workingHours: data.workingHours || [],
-          });
-        } else {
-          // Use defaults if fetch fails
-          console.warn('Failed to fetch working hours, using defaults');
+        if (workingHoursError) {
+          console.warn('Failed to fetch working hours:', workingHoursError);
           setOrgSettings({ timezone: null, workingHours: [] });
+        } else {
+          console.log('Working hours data:', workingHoursData);
+          setOrgSettings({
+            timezone: workingHoursData?.timezone || null,
+            workingHours: workingHoursData?.workingHours || [],
+          });
         }
       } catch (err) {
         console.warn('Error fetching working hours:', err);

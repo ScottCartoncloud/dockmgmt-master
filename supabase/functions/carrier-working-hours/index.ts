@@ -24,7 +24,17 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const url = new URL(req.url);
-    const bookingLinkId = url.searchParams.get('bookingLinkId');
+    let bookingLinkId = url.searchParams.get('bookingLinkId');
+
+    // Also accept bookingLinkId from request body for POST requests
+    if (!bookingLinkId && req.method === 'POST') {
+      try {
+        const body = await req.json();
+        bookingLinkId = body.bookingLinkId;
+      } catch {
+        // Ignore JSON parse errors
+      }
+    }
 
     if (!bookingLinkId) {
       return new Response(
