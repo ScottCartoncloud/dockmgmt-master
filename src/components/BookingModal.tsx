@@ -85,7 +85,7 @@ export function BookingModal({
   const { data: dockDoors } = useDockDoors();
   const { data: customFields } = useActiveCustomBookingFields();
   const { carriers } = useCarriers();
-  const searchOrders = useSearchCartonCloudOrders();
+  const { mutate: mutateSearchOrders, isPending: isSearchPending } = useSearchCartonCloudOrders();
   const isCartonCloudConnected = !!cartonCloudSettings;
   const activeDocks = useMemo(() => (dockDoors || []).filter((d) => d.is_active), [dockDoors]);
   
@@ -100,7 +100,7 @@ export function BookingModal({
 
   const performPoSearch = useCallback((term: string) => {
     if (term.length >= 2 && isCartonCloudConnected) {
-      searchOrders.mutate(term, {
+      mutateSearchOrders(term, {
         onSuccess: (results) => {
           setSearchResults(results);
         },
@@ -111,7 +111,7 @@ export function BookingModal({
     } else {
       setSearchResults([]);
     }
-  }, [isCartonCloudConnected, searchOrders]);
+  }, [isCartonCloudConnected, mutateSearchOrders]);
 
   const debouncedSearch = useDebouncedCallback(performPoSearch, 300);
 
@@ -279,18 +279,18 @@ export function BookingModal({
                         onValueChange={setSearchTerm}
                       />
                       <CommandList>
-                        {searchOrders.isPending && (
+                        {isSearchPending && (
                           <div className="flex items-center justify-center py-4">
                             <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                             <span className="ml-2 text-sm text-muted-foreground">Searching...</span>
                           </div>
                         )}
-                        {!searchOrders.isPending && searchTerm.length < 2 && (
+                        {!isSearchPending && searchTerm.length < 2 && (
                           <div className="py-4 text-center text-sm text-muted-foreground">
                             Type at least 2 characters to search
                           </div>
                         )}
-                        {!searchOrders.isPending && searchTerm.length >= 2 && searchResults.length === 0 && (
+                        {!isSearchPending && searchTerm.length >= 2 && searchResults.length === 0 && (
                           <CommandEmpty>No purchase orders found.</CommandEmpty>
                         )}
                         {searchResults.length > 0 && (
