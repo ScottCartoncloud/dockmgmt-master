@@ -308,15 +308,21 @@ export function BookingModal({
                                 className="cursor-pointer"
                               >
                                 <div className="flex flex-col gap-1 flex-1">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-medium">PO: {po.reference}</span>
                                     <Badge variant={getStatusBadgeVariant(po.status)} className="text-xs">
                                       {po.status}
                                     </Badge>
+                                    {po.urgent && (
+                                      <Badge variant="destructive" className="text-xs">Urgent</Badge>
+                                    )}
                                   </div>
                                   <div className="text-sm text-muted-foreground">
-                                    {po.customer} • {po.itemCount} items
-                                    {po.arrivalDate && ` • ETA: ${po.arrivalDate}`}
+                                    {po.customer} • {po.warehouseName}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {po.itemCount} line{po.itemCount !== 1 ? 's' : ''}
+                                    {po.arrivalDate && ` • Arrival: ${po.arrivalDate}`}
                                   </div>
                                 </div>
                                 <ExternalLink className="w-4 h-4 text-muted-foreground" />
@@ -330,11 +336,22 @@ export function BookingModal({
                 </Popover>
                 {selectedPO && (
                   <div className="flex items-center justify-between p-3 bg-accent/5 border border-accent/20 rounded-md">
-                    <div className="space-y-1">
-                      <div className="font-medium text-sm">PO: {selectedPO.reference}</div>
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">PO: {selectedPO.reference}</span>
+                        <Badge variant={getStatusBadgeVariant(selectedPO.status)} className="text-xs">
+                          {selectedPO.status}
+                        </Badge>
+                        {selectedPO.urgent && (
+                          <Badge variant="destructive" className="text-xs">Urgent</Badge>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground">
-                        {selectedPO.customer} • {selectedPO.status}
-                        {selectedPO.arrivalDate && ` • ETA: ${selectedPO.arrivalDate}`}
+                        {selectedPO.customer} • {selectedPO.warehouseName}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {selectedPO.itemCount} line{selectedPO.itemCount !== 1 ? 's' : ''}
+                        {selectedPO.arrivalDate && ` • Arrival: ${selectedPO.arrivalDate}`}
                       </div>
                     </div>
                     <Button

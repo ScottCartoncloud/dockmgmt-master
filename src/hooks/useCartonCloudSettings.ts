@@ -146,6 +146,14 @@ export function useDeleteCartonCloudSettings() {
   });
 }
 
+export interface CartonCloudOrderItem {
+  id: string;
+  poNumber: string;
+  quantity: number;
+  productName: string;
+  unitOfMeasure: string;
+}
+
 export interface CartonCloudOrder {
   id: string;
   reference: string;
@@ -154,6 +162,10 @@ export interface CartonCloudOrder {
   arrivalDate: string | null;
   itemCount: number;
   warehouseName: string;
+  urgent?: boolean;
+  instructions?: string;
+  numericId?: string | null;
+  items?: CartonCloudOrderItem[];
 }
 
 export function useSearchCartonCloudOrders() {
