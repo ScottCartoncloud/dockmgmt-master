@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.accept-invite-by-email]
 verify_jwt = true
+
+[functions.carrier-working-hours]
+verify_jwt = false
+
+[functions.cartoncloud-credentials]
+verify_jwt = true
