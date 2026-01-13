@@ -212,13 +212,18 @@ async function searchInboundOrders(
 ): Promise<any[]> {
   console.log('Searching inbound orders for reference:', searchTerm, 'at:', apiBaseUrl);
   
-  // Search only by reference number
+  // Search only by reference number (CartonCloud expects a compound condition with `conditions`)
   const searchPayload = {
     condition: {
-      type: 'TextComparisonCondition',
-      field: { type: 'ValueField', value: 'reference' },
-      value: { type: 'ValueField', value: searchTerm },
-      method: 'STARTS_WITH',
+      type: 'OrCondition',
+      conditions: [
+        {
+          type: 'TextComparisonCondition',
+          field: { type: 'ValueField', value: 'reference' },
+          value: { type: 'ValueField', value: searchTerm },
+          method: 'STARTS_WITH',
+        },
+      ],
     },
   };
 

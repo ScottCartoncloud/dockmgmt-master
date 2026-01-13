@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { CrossDockBooking, CartonCloudPO, CustomFieldValues } from '@/types/booking';
 import { format, parse } from 'date-fns';
 import { X, Search, Package, ExternalLink, Trash2, Loader2, Check, ChevronsUpDown, Truck } from 'lucide-react';
@@ -98,7 +98,7 @@ export function BookingModal({
 
   const isEditing = !!booking;
 
-  const debouncedSearch = useDebouncedCallback((term: string) => {
+  const performPoSearch = useCallback((term: string) => {
     if (term.length >= 2 && isCartonCloudConnected) {
       searchOrders.mutate(term, {
         onSuccess: (results) => {
@@ -111,7 +111,9 @@ export function BookingModal({
     } else {
       setSearchResults([]);
     }
-  }, 300);
+  }, [isCartonCloudConnected, searchOrders]);
+
+  const debouncedSearch = useDebouncedCallback(performPoSearch, 300);
 
   useEffect(() => {
     debouncedSearch(searchTerm);
