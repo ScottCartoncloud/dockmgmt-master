@@ -16,6 +16,18 @@ interface WorkingHoursResponse {
   }>;
 }
 
+// Default working hours (Mon-Fri 08:00-17:00, Sat-Sun disabled)
+// Matches Organisation Settings defaults
+const DEFAULT_WORKING_HOURS = [
+  { day_of_week: 0, enabled: false, start_time: '08:00:00', end_time: '17:00:00' }, // Sunday
+  { day_of_week: 1, enabled: true, start_time: '08:00:00', end_time: '17:00:00' },  // Monday
+  { day_of_week: 2, enabled: true, start_time: '08:00:00', end_time: '17:00:00' },  // Tuesday
+  { day_of_week: 3, enabled: true, start_time: '08:00:00', end_time: '17:00:00' },  // Wednesday
+  { day_of_week: 4, enabled: true, start_time: '08:00:00', end_time: '17:00:00' },  // Thursday
+  { day_of_week: 5, enabled: true, start_time: '08:00:00', end_time: '17:00:00' },  // Friday
+  { day_of_week: 6, enabled: false, start_time: '08:00:00', end_time: '17:00:00' }, // Saturday
+];
+
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -92,12 +104,21 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Use default working hours if none configured
+    const workingHours = workingHoursResult.data && workingHoursResult.data.length > 0
+      ? workingHoursResult.data
+      : DEFAULT_WORKING_HOURS;
+
     const response: WorkingHoursResponse = {
       timezone: tenantResult.data?.timezone || null,
-      workingHours: workingHoursResult.data || [],
+      workingHours,
     };
 
-    console.log(`Fetched working hours for booking link ${bookingLinkId}:`, response);
+    console.log(`Fetched working hours for booking link ${bookingLinkId}:`, {
+      hasConfiguredHours: workingHoursResult.data && workingHoursResult.data.length > 0,
+      usingDefaults: !workingHoursResult.data || workingHoursResult.data.length === 0,
+      response,
+    });
 
     return new Response(
       JSON.stringify(response),

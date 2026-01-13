@@ -57,9 +57,9 @@ const bookingSchema = z.object({
   confirmationEmail: z.string().email('Please enter a valid email').max(255),
 });
 
-// Default fallback hours (6 AM to 6 PM) if no org settings exist
-const DEFAULT_START_TIME = '06:00';
-const DEFAULT_END_TIME = '18:00';
+// Default fallback hours (8 AM to 5 PM) to match Organisation Settings defaults
+const DEFAULT_START_TIME = '08:00';
+const DEFAULT_END_TIME = '17:00';
 
 // Generate time slots based on working hours for a specific day
 const generateTimeSlotsForDay = (
