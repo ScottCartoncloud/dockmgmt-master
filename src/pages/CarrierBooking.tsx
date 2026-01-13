@@ -76,15 +76,16 @@ const generateTimeSlotsForDay = (
   let endTime = DEFAULT_END_TIME;
   
   if (dayConfig && dayConfig.enabled) {
-    startTime = dayConfig.start_time;
-    endTime = dayConfig.end_time;
+    // Normalize time format (handle both HH:MM and HH:MM:SS from database)
+    startTime = dayConfig.start_time.substring(0, 5);
+    endTime = dayConfig.end_time.substring(0, 5);
   } else if (dayConfig && !dayConfig.enabled) {
     // Day is disabled, return empty slots
     return [];
   }
   // If no config exists, use defaults (all days enabled)
   
-  // Parse times
+  // Parse times (now guaranteed to be HH:MM format)
   const [startHour, startMin] = startTime.split(':').map(Number);
   const [endHour, endMin] = endTime.split(':').map(Number);
   
