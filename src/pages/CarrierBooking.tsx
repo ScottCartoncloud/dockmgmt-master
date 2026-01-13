@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format, getDay } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -19,11 +20,9 @@ import {
   CheckCircle2, 
   AlertCircle,
   ChevronLeft,
-  ChevronRight,
   Truck
 } from 'lucide-react';
 import cartonCloudLogo from '@/assets/cartoncloud-logo.png';
-
 
 interface CarrierInfo {
   id: string;
@@ -38,6 +37,18 @@ interface TimeSlot {
   label: string;
 }
 
+interface WorkingHoursConfig {
+  day_of_week: number;
+  enabled: boolean;
+  start_time: string;
+  end_time: string;
+}
+
+interface OrganisationSettings {
+  timezone: string | null;
+  workingHours: WorkingHoursConfig[];
+}
+
 const bookingSchema = z.object({
   title: z.string().min(1, 'Booking title is required').max(200),
   pallets: z.number().min(0, 'Pallets must be 0 or greater').optional(),
@@ -46,29 +57,75 @@ const bookingSchema = z.object({
   confirmationEmail: z.string().email('Please enter a valid email').max(255),
 });
 
-// Generate time slots from 6 AM to 6 PM in 30-minute increments
-const generateTimeSlots = (): TimeSlot[] => {
+// Default fallback hours (6 AM to 6 PM) if no org settings exist
+const DEFAULT_START_TIME = '06:00';
+const DEFAULT_END_TIME = '18:00';
+
+// Generate time slots based on working hours for a specific day
+const generateTimeSlotsForDay = (
+  dayOfWeek: number,
+  workingHours: WorkingHoursConfig[]
+): TimeSlot[] => {
   const slots: TimeSlot[] = [];
-  for (let hour = 6; hour < 18; hour++) {
-    for (let minute = 0; minute < 60; minute += 30) {
-      const startHour = hour.toString().padStart(2, '0');
-      const startMin = minute.toString().padStart(2, '0');
-      const endMinute = (minute + 30) % 60;
-      const endHour = minute + 30 >= 60 ? hour + 1 : hour;
-      const endHourStr = endHour.toString().padStart(2, '0');
-      const endMinStr = endMinute.toString().padStart(2, '0');
-      
-      slots.push({
-        start: `${startHour}:${startMin}`,
-        end: `${endHourStr}:${endMinStr}`,
-        label: `${startHour}:${startMin} - ${endHourStr}:${endMinStr}`,
-      });
-    }
+  
+  // Find the config for this day
+  const dayConfig = workingHours.find(wh => wh.day_of_week === dayOfWeek);
+  
+  // Determine start and end times
+  let startTime = DEFAULT_START_TIME;
+  let endTime = DEFAULT_END_TIME;
+  
+  if (dayConfig && dayConfig.enabled) {
+    startTime = dayConfig.start_time;
+    endTime = dayConfig.end_time;
+  } else if (dayConfig && !dayConfig.enabled) {
+    // Day is disabled, return empty slots
+    return [];
   }
+  // If no config exists, use defaults (all days enabled)
+  
+  // Parse times
+  const [startHour, startMin] = startTime.split(':').map(Number);
+  const [endHour, endMin] = endTime.split(':').map(Number);
+  
+  const startMinutes = startHour * 60 + startMin;
+  const endMinutes = endHour * 60 + endMin;
+  
+  // Generate 30-minute slots within working hours
+  for (let minutes = startMinutes; minutes < endMinutes; minutes += 30) {
+    const slotEndMinutes = minutes + 30;
+    
+    // Ensure the slot ends within working hours
+    if (slotEndMinutes > endMinutes) break;
+    
+    const slotStartHour = Math.floor(minutes / 60);
+    const slotStartMin = minutes % 60;
+    const slotEndHour = Math.floor(slotEndMinutes / 60);
+    const slotEndMin = slotEndMinutes % 60;
+    
+    const startStr = `${slotStartHour.toString().padStart(2, '0')}:${slotStartMin.toString().padStart(2, '0')}`;
+    const endStr = `${slotEndHour.toString().padStart(2, '0')}:${slotEndMin.toString().padStart(2, '0')}`;
+    
+    slots.push({
+      start: startStr,
+      end: endStr,
+      label: `${startStr} - ${endStr}`,
+    });
+  }
+  
   return slots;
 };
 
-const TIME_SLOTS = generateTimeSlots();
+// Check if a day is a working day
+const isDayWorking = (dayOfWeek: number, workingHours: WorkingHoursConfig[]): boolean => {
+  // If no working hours configured, default to Mon-Fri
+  if (workingHours.length === 0) {
+    return dayOfWeek >= 1 && dayOfWeek <= 5;
+  }
+  
+  const dayConfig = workingHours.find(wh => wh.day_of_week === dayOfWeek);
+  return dayConfig?.enabled ?? false;
+};
 
 export default function CarrierBooking() {
   const { bookingLinkId } = useParams<{ bookingLinkId: string }>();
@@ -80,6 +137,7 @@ export default function CarrierBooking() {
   const [error, setError] = useState<string | null>(null);
   const [carrier, setCarrier] = useState<CarrierInfo | null>(null);
   const [bookedSlots, setBookedSlots] = useState<Set<string>>(new Set());
+  const [orgSettings, setOrgSettings] = useState<OrganisationSettings | null>(null);
 
   // Form state
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
@@ -92,7 +150,14 @@ export default function CarrierBooking() {
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const [recaptchaSiteKey, setRecaptchaSiteKey] = useState<string>('');
 
-  // Fetch carrier info and reCAPTCHA config
+  // Generate time slots for the selected date based on working hours
+  const timeSlots = useMemo(() => {
+    if (!selectedDate || !orgSettings) return [];
+    const dayOfWeek = getDay(selectedDate);
+    return generateTimeSlotsForDay(dayOfWeek, orgSettings.workingHours);
+  }, [selectedDate, orgSettings]);
+
+  // Fetch carrier info, reCAPTCHA config, and working hours
   useEffect(() => {
     const fetchData = async () => {
       if (!bookingLinkId) {
@@ -101,14 +166,18 @@ export default function CarrierBooking() {
         return;
       }
 
-      // Fetch carrier and reCAPTCHA config in parallel
-      const [carrierResult, recaptchaResult] = await Promise.all([
+      // Fetch carrier, reCAPTCHA config, and working hours in parallel
+      const [carrierResult, recaptchaResult, workingHoursResult] = await Promise.all([
         supabase
           .from('carriers_public')
           .select('id, name, tenant_id, is_booking_link_enabled')
           .eq('booking_link_id', bookingLinkId)
           .maybeSingle(),
         supabase.functions.invoke('recaptcha-config'),
+        supabase.functions.invoke('carrier-working-hours', {
+          body: null,
+          headers: {},
+        }).catch(() => ({ data: null, error: 'Failed to fetch' })),
       ]);
 
       // Handle carrier
@@ -138,6 +207,40 @@ export default function CarrierBooking() {
         setRecaptchaSiteKey(recaptchaResult.data.siteKey);
       }
 
+      // Fetch working hours via edge function with query param
+      const workingHoursResponse = await supabase.functions.invoke('carrier-working-hours', {
+        body: null,
+        headers: {},
+      });
+
+      // Try fetching with the bookingLinkId as query param
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/carrier-working-hours?bookingLinkId=${bookingLinkId}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          setOrgSettings({
+            timezone: data.timezone,
+            workingHours: data.workingHours || [],
+          });
+        } else {
+          // Use defaults if fetch fails
+          console.warn('Failed to fetch working hours, using defaults');
+          setOrgSettings({ timezone: null, workingHours: [] });
+        }
+      } catch (err) {
+        console.warn('Error fetching working hours:', err);
+        setOrgSettings({ timezone: null, workingHours: [] });
+      }
+
       setIsLoading(false);
     };
 
@@ -161,7 +264,7 @@ export default function CarrierBooking() {
         const booked = new Set<string>();
         data.forEach(booking => {
           // Mark all slots that overlap with this booking as booked
-          TIME_SLOTS.forEach(slot => {
+          timeSlots.forEach(slot => {
             if (slot.start >= booking.start_time && slot.start < booking.end_time) {
               booked.add(slot.start);
             }
@@ -172,11 +275,26 @@ export default function CarrierBooking() {
     };
 
     fetchBookedSlots();
-  }, [selectedDate, carrier]);
+  }, [selectedDate, carrier, timeSlots]);
+
+  // Function to check if a date should be disabled
+  const isDateDisabled = (date: Date): boolean => {
+    // Disable past dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (date < today) return true;
+    
+    // Check if day is a working day
+    if (!orgSettings) return false;
+    
+    const dayOfWeek = getDay(date);
+    return !isDayWorking(dayOfWeek, orgSettings.workingHours);
+  };
 
   const handleDateSelect = (date: Date | undefined) => {
     setSelectedDate(date);
     setSelectedSlot(null);
+    setBookedSlots(new Set()); // Reset booked slots when date changes
     if (date) {
       setStep(2);
     }
@@ -259,6 +377,18 @@ export default function CarrierBooking() {
     }
   };
 
+  // Format date for display using org timezone if available
+  const formatDisplayDate = (date: Date, formatStr: string): string => {
+    if (orgSettings?.timezone) {
+      try {
+        return formatInTimeZone(date, orgSettings.timezone, formatStr);
+      } catch {
+        return format(date, formatStr);
+      }
+    }
+    return format(date, formatStr);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-header">
@@ -297,6 +427,11 @@ export default function CarrierBooking() {
               <Truck className="w-4 h-4" />
               {carrier?.name}
             </p>
+            {orgSettings?.timezone && (
+              <p className="text-xs text-muted-foreground mt-1">
+                All times shown in {orgSettings.timezone.replace(/_/g, ' ')}
+              </p>
+            )}
           </div>
 
           {/* Progress Steps */}
@@ -351,7 +486,7 @@ export default function CarrierBooking() {
                 mode="single"
                 selected={selectedDate}
                 onSelect={handleDateSelect}
-                disabled={(date) => date < new Date() || date.getDay() === 0 || date.getDay() === 6}
+                disabled={isDateDisabled}
                 className="rounded-md border mx-auto"
               />
             </div>
@@ -366,7 +501,7 @@ export default function CarrierBooking() {
                   Back
                 </Button>
                 <span className="text-sm text-muted-foreground">
-                  {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+                  {formatDisplayDate(selectedDate, 'EEEE, MMMM d, yyyy')}
                 </span>
               </div>
               
@@ -375,22 +510,32 @@ export default function CarrierBooking() {
                 <span>Select a time slot</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
-                {TIME_SLOTS.map((slot) => {
-                  const isBooked = bookedSlots.has(slot.start);
-                  return (
-                    <Button
-                      key={slot.start}
-                      variant={selectedSlot?.start === slot.start ? 'default' : 'outline'}
-                      className={`text-sm ${isBooked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      disabled={isBooked}
-                      onClick={() => handleSlotSelect(slot)}
-                    >
-                      {slot.label}
-                    </Button>
-                  );
-                })}
-              </div>
+              {timeSlots.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <AlertCircle className="w-8 h-8 mx-auto mb-2" />
+                  <p>No available time slots for this date.</p>
+                  <Button variant="link" onClick={goBack} className="mt-2">
+                    Choose a different date
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
+                  {timeSlots.map((slot) => {
+                    const isBooked = bookedSlots.has(slot.start);
+                    return (
+                      <Button
+                        key={slot.start}
+                        variant={selectedSlot?.start === slot.start ? 'default' : 'outline'}
+                        className={`text-sm ${isBooked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        disabled={isBooked}
+                        onClick={() => handleSlotSelect(slot)}
+                      >
+                        {slot.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -403,7 +548,7 @@ export default function CarrierBooking() {
                   Back
                 </Button>
                 <span className="text-sm text-muted-foreground">
-                  {format(selectedDate, 'MMM d')} • {selectedSlot.label}
+                  {formatDisplayDate(selectedDate, 'MMM d')} • {selectedSlot.label}
                 </span>
               </div>
 

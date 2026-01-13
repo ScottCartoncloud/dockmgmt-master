@@ -21,6 +21,70 @@ interface BookingRequest {
   confirmationEmail: string;
 }
 
+interface WorkingHoursConfig {
+  day_of_week: number;
+  enabled: boolean;
+  start_time: string;
+  end_time: string;
+}
+
+// Convert time string (HH:mm) to minutes since midnight
+const timeStringToMinutes = (timeStr: string): number => {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+// Validate booking time against working hours
+const validateBookingAgainstWorkingHours = (
+  date: string,
+  startTime: string,
+  endTime: string,
+  workingHours: WorkingHoursConfig[]
+): { valid: boolean; reason?: string } => {
+  // Parse the date to get day of week (0 = Sunday, 6 = Saturday)
+  const dateObj = new Date(date + 'T00:00:00');
+  const dayOfWeek = dateObj.getDay();
+  
+  // If no working hours configured, allow all times (fallback)
+  if (workingHours.length === 0) {
+    return { valid: true };
+  }
+  
+  // Find config for this day
+  const dayConfig = workingHours.find(wh => wh.day_of_week === dayOfWeek);
+  
+  // If day not found or not enabled, reject
+  if (!dayConfig || !dayConfig.enabled) {
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return {
+      valid: false,
+      reason: `${dayNames[dayOfWeek]} is not a working day for this organisation.`,
+    };
+  }
+  
+  // Validate time range
+  const bookingStartMinutes = timeStringToMinutes(startTime);
+  const bookingEndMinutes = timeStringToMinutes(endTime);
+  const workStartMinutes = timeStringToMinutes(dayConfig.start_time);
+  const workEndMinutes = timeStringToMinutes(dayConfig.end_time);
+  
+  if (bookingStartMinutes < workStartMinutes) {
+    return {
+      valid: false,
+      reason: `Start time is before working hours begin (${dayConfig.start_time}).`,
+    };
+  }
+  
+  if (bookingEndMinutes > workEndMinutes) {
+    return {
+      valid: false,
+      reason: `End time is after working hours end (${dayConfig.end_time}).`,
+    };
+  }
+  
+  return { valid: true };
+};
+
 const formatTime = (time: string): string => {
   const [hours, minutes] = time.split(':');
   const hour = parseInt(hours, 10);
@@ -235,12 +299,37 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Get tenant name for email
-    const { data: tenant } = await supabase
-      .from('tenants')
-      .select('name')
-      .eq('id', carrier.tenant_id)
-      .single();
+    // Get tenant name and working hours for validation
+    const [tenantResult, workingHoursResult] = await Promise.all([
+      supabase
+        .from('tenants')
+        .select('name')
+        .eq('id', carrier.tenant_id)
+        .single(),
+      supabase
+        .from('tenant_working_hours')
+        .select('day_of_week, enabled, start_time, end_time')
+        .eq('tenant_id', carrier.tenant_id),
+    ]);
+
+    const tenant = tenantResult.data;
+    const workingHours: WorkingHoursConfig[] = workingHoursResult.data || [];
+
+    // Validate booking against working hours
+    const validation = validateBookingAgainstWorkingHours(
+      bookingData.date,
+      bookingData.startTime,
+      bookingData.endTime,
+      workingHours
+    );
+
+    if (!validation.valid) {
+      console.warn('Booking rejected - outside working hours:', validation.reason);
+      return new Response(
+        JSON.stringify({ error: validation.reason }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Create the booking with carrier_id linked and carrier name stored
     const { data: booking, error: insertError } = await supabase
