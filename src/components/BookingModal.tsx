@@ -272,7 +272,7 @@ export function BookingModal({
                   <PopoverContent className="w-[400px] p-0" align="start">
                     <Command shouldFilter={false}>
                       <CommandInput 
-                        placeholder="Type PO number or customer name..." 
+                        placeholder="Type PO reference number..." 
                         value={searchTerm}
                         onValueChange={setSearchTerm}
                       />

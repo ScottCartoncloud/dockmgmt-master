@@ -210,11 +210,12 @@ async function searchInboundOrders(
   searchTerm: string,
   apiBaseUrl: string = DEFAULT_CARTONCLOUD_API_BASE
 ): Promise<any[]> {
-  console.log('Searching inbound orders for:', searchTerm, 'at:', apiBaseUrl);
+  console.log('Searching inbound orders for reference:', searchTerm, 'at:', apiBaseUrl);
   
+  // Search only by reference number and exclude ALLOCATED status
   const searchPayload = {
     condition: {
-      type: 'OrCondition',
+      type: 'AndCondition',
       conditions: [
         {
           type: 'TextComparisonCondition',
@@ -223,10 +224,13 @@ async function searchInboundOrders(
           method: 'STARTS_WITH',
         },
         {
-          type: 'TextComparisonCondition',
-          field: { type: 'ValueField', value: 'customerName' },
-          value: { type: 'ValueField', value: searchTerm },
-          method: 'STARTS_WITH',
+          type: 'NotCondition',
+          condition: {
+            type: 'TextComparisonCondition',
+            field: { type: 'ValueField', value: 'status' },
+            value: { type: 'ValueField', value: 'ALLOCATED' },
+            method: 'EQUALS',
+          },
         },
       ],
     },
@@ -257,7 +261,7 @@ async function searchInboundOrders(
     }
 
     const results = await response.json();
-    console.log('Search returned', results.length, 'results');
+    console.log('Search returned', results.length, 'results (excluding ALLOCATED)');
     return results;
   } finally {
     clearTimeout(timeoutId);
