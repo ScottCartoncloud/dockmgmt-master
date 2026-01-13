@@ -212,27 +212,13 @@ async function searchInboundOrders(
 ): Promise<any[]> {
   console.log('Searching inbound orders for reference:', searchTerm, 'at:', apiBaseUrl);
   
-  // Search only by reference number and exclude ALLOCATED status
+  // Search only by reference number
   const searchPayload = {
     condition: {
-      type: 'AndCondition',
-      conditions: [
-        {
-          type: 'TextComparisonCondition',
-          field: { type: 'ValueField', value: 'reference' },
-          value: { type: 'ValueField', value: searchTerm },
-          method: 'STARTS_WITH',
-        },
-        {
-          type: 'NotCondition',
-          condition: {
-            type: 'TextComparisonCondition',
-            field: { type: 'ValueField', value: 'status' },
-            value: { type: 'ValueField', value: 'ALLOCATED' },
-            method: 'EQUALS',
-          },
-        },
-      ],
+      type: 'TextComparisonCondition',
+      field: { type: 'ValueField', value: 'reference' },
+      value: { type: 'ValueField', value: searchTerm },
+      method: 'STARTS_WITH',
     },
   };
 
@@ -261,8 +247,15 @@ async function searchInboundOrders(
     }
 
     const results = await response.json();
-    console.log('Search returned', results.length, 'results (excluding ALLOCATED)');
-    return results;
+    
+    // Filter out ALLOCATED status client-side (API doesn't support NotCondition)
+    const filteredResults = results.filter((order: any) => {
+      const status = order.status || order.Status || '';
+      return status.toUpperCase() !== 'ALLOCATED';
+    });
+    
+    console.log('Search returned', results.length, 'results,', filteredResults.length, 'after filtering ALLOCATED');
+    return filteredResults;
   } finally {
     clearTimeout(timeoutId);
   }
