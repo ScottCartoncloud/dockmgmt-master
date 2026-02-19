@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Header } from '@/components/Header';
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Users, Building2, Pencil } from 'lucide-react';
+import { Plus, Users, Building2, Pencil, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -28,6 +28,7 @@ interface Profile {
 interface UserWithRole extends Profile {
   roles: { role: AppRole }[];
   tenant_name?: string;
+  enrolled_tenants?: { id: string; tenant_id: string; tenant_name: string }[];
 }
 
 interface Tenant {
@@ -48,42 +49,51 @@ export default function Admin() {
   const [newUserRole, setNewUserRole] = useState<AppRole>('viewer');
   const [newUserTenant, setNewUserTenant] = useState<string>('');
   const [newTenantName, setNewTenantName] = useState('');
+  const [editPrimaryTenant, setEditPrimaryTenant] = useState<string>('unassigned');
+  const [editRole, setEditRole] = useState<AppRole>('viewer');
+  const [addTenantId, setAddTenantId] = useState<string>('');
 
   // Fetch all users with their roles and tenant info
   const { data: users, isLoading: usersLoading } = useQuery({
     queryKey: ['admin-users'],
     queryFn: async () => {
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*');
+      const [profilesResult, rolesResult, tenantsResult, enrollmentsResult] = await Promise.all([
+        supabase.from('profiles').select('*'),
+        supabase.from('user_roles').select('user_id, role'),
+        supabase.from('tenants').select('id, name'),
+        supabase.from('user_tenants').select('id, user_id, tenant_id'),
+      ]);
       
-      if (profilesError) throw profilesError;
+      if (profilesResult.error) throw profilesResult.error;
+      if (rolesResult.error) throw rolesResult.error;
+      if (tenantsResult.error) throw tenantsResult.error;
 
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
-      
-      if (rolesError) throw rolesError;
-
-      const { data: tenants, error: tenantsError } = await supabase
-        .from('tenants')
-        .select('id, name');
-      
-      if (tenantsError) throw tenantsError;
-
-      const tenantMap = new Map(tenants?.map(t => [t.id, t.name]));
+      const tenantMap = new Map(tenantsResult.data?.map(t => [t.id, t.name]));
       const roleMap = new Map<string, { role: AppRole }[]>();
       
-      roles?.forEach(r => {
+      rolesResult.data?.forEach(r => {
         const existing = roleMap.get(r.user_id) || [];
         existing.push({ role: r.role as AppRole });
         roleMap.set(r.user_id, existing);
       });
 
-      return profiles?.map(p => ({
+      // Build enrollment map
+      const enrollmentMap = new Map<string, { id: string; tenant_id: string; tenant_name: string }[]>();
+      enrollmentsResult.data?.forEach(e => {
+        const existing = enrollmentMap.get(e.user_id) || [];
+        existing.push({
+          id: e.id,
+          tenant_id: e.tenant_id,
+          tenant_name: tenantMap.get(e.tenant_id) || 'Unknown',
+        });
+        enrollmentMap.set(e.user_id, existing);
+      });
+
+      return profilesResult.data?.map(p => ({
         ...p,
         roles: roleMap.get(p.id) || [],
-        tenant_name: p.tenant_id ? tenantMap.get(p.tenant_id) : undefined
+        tenant_name: p.tenant_id ? tenantMap.get(p.tenant_id) : undefined,
+        enrolled_tenants: enrollmentMap.get(p.id) || [],
       })) as UserWithRole[];
     }
   });
@@ -137,10 +147,10 @@ export default function Admin() {
     }
   });
 
-  // Update user's tenant and role
+  // Update user's primary tenant and role
   const updateUserMutation = useMutation({
     mutationFn: async ({ userId, tenantId, role }: { userId: string; tenantId: string | null; role: AppRole }) => {
-      // Update profile tenant
+      // Update profile's primary tenant
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ tenant_id: tenantId })
@@ -161,6 +171,13 @@ export default function Admin() {
         .insert({ user_id: userId, role });
       
       if (insertError) throw insertError;
+
+      // Ensure the primary tenant is also in user_tenants
+      if (tenantId) {
+        await supabase
+          .from('user_tenants')
+          .upsert({ user_id: userId, tenant_id: tenantId }, { onConflict: 'user_id,tenant_id' });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
@@ -171,6 +188,56 @@ export default function Admin() {
     },
     onError: (error) => {
       toast.error('Failed to update user: ' + error.message);
+    }
+  });
+
+  // Add tenant enrollment
+  const addEnrollmentMutation = useMutation({
+    mutationFn: async ({ userId, tenantId }: { userId: string; tenantId: string }) => {
+      const { error } = await supabase
+        .from('user_tenants')
+        .insert({ user_id: userId, tenant_id: tenantId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setAddTenantId('');
+      toast.success('Tenant enrollment added');
+    },
+    onError: (error) => {
+      toast.error('Failed to add enrollment: ' + error.message);
+    }
+  });
+
+  // Remove tenant enrollment
+  const removeEnrollmentMutation = useMutation({
+    mutationFn: async ({ enrollmentId, userId, tenantId }: { enrollmentId: string; userId: string; tenantId: string }) => {
+      const { error } = await supabase
+        .from('user_tenants')
+        .delete()
+        .eq('id', enrollmentId);
+      if (error) throw error;
+
+      // If removing the primary tenant, clear it from profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('tenant_id')
+        .eq('id', userId)
+        .single();
+      
+      if (profile?.tenant_id === tenantId) {
+        await supabase
+          .from('profiles')
+          .update({ tenant_id: null })
+          .eq('id', userId);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast.success('Tenant enrollment removed');
+    },
+    onError: (error) => {
+      toast.error('Failed to remove enrollment: ' + error.message);
     }
   });
 
@@ -201,10 +268,22 @@ export default function Admin() {
 
   const handleEditUser = (user: UserWithRole) => {
     setSelectedUser(user);
-    setNewUserTenant(user.tenant_id || 'unassigned');
-    setNewUserRole(user.roles[0]?.role || 'viewer');
+    setEditPrimaryTenant(user.tenant_id || 'unassigned');
+    setEditRole(user.roles[0]?.role || 'viewer');
+    setAddTenantId('');
     setIsEditUserOpen(true);
   };
+
+  // Keep selectedUser in sync when users data refreshes (e.g. after adding/removing enrollments)
+  useEffect(() => {
+    if (selectedUser && users) {
+      const updated = users.find(u => u.id === selectedUser.id);
+      if (updated) {
+        setSelectedUser(updated);
+        setEditPrimaryTenant(updated.tenant_id || 'unassigned');
+      }
+    }
+  }, [users]);
 
   const getRoleBadgeVariant = (role: AppRole) => {
     switch (role) {
@@ -334,7 +413,17 @@ export default function Admin() {
                             {user.roles.length === 0 && <span className="text-muted-foreground">No role</span>}
                           </TableCell>
                           <TableCell>
-                            {user.tenant_name || <span className="text-muted-foreground">Unassigned</span>}
+                            {user.enrolled_tenants && user.enrolled_tenants.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {user.enrolled_tenants.map(et => (
+                                  <Badge key={et.id} variant={et.tenant_id === user.tenant_id ? 'default' : 'outline'} className="text-xs">
+                                    {et.tenant_name}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">Unassigned</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <Button 
@@ -431,23 +520,90 @@ export default function Admin() {
                   <Label className="text-muted-foreground">Email</Label>
                   <p className="font-medium">{selectedUser.email}</p>
                 </div>
+
+                {/* Enrolled Tenants */}
                 <div className="space-y-2">
-                  <Label>Tenant</Label>
-                  <Select value={newUserTenant} onValueChange={setNewUserTenant}>
+                  <Label>Enrolled Tenants</Label>
+                  <div className="space-y-2">
+                    {selectedUser.enrolled_tenants && selectedUser.enrolled_tenants.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedUser.enrolled_tenants.map(et => (
+                          <Badge key={et.id} variant={et.tenant_id === selectedUser.tenant_id ? 'default' : 'secondary'} className="flex items-center gap-1 py-1">
+                            {et.tenant_name}
+                            {et.tenant_id === selectedUser.tenant_id && (
+                              <span className="text-[10px] opacity-70">(primary)</span>
+                            )}
+                            <button
+                              onClick={() => removeEnrollmentMutation.mutate({
+                                enrollmentId: et.id,
+                                userId: selectedUser.id,
+                                tenantId: et.tenant_id,
+                              })}
+                              className="ml-1 hover:text-destructive"
+                              disabled={removeEnrollmentMutation.isPending}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No tenants enrolled</p>
+                    )}
+                    
+                    {/* Add tenant enrollment */}
+                    <div className="flex gap-2">
+                      <Select value={addTenantId} onValueChange={setAddTenantId}>
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Add tenant..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {tenants?.filter(t => 
+                            !selectedUser.enrolled_tenants?.some(et => et.tenant_id === t.id)
+                          ).map(t => (
+                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (addTenantId) {
+                            addEnrollmentMutation.mutate({
+                              userId: selectedUser.id,
+                              tenantId: addTenantId,
+                            });
+                          }
+                        }}
+                        disabled={!addTenantId || addEnrollmentMutation.isPending}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Primary Tenant */}
+                <div className="space-y-2">
+                  <Label>Primary Tenant</Label>
+                  <Select value={editPrimaryTenant} onValueChange={setEditPrimaryTenant}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select tenant" />
+                      <SelectValue placeholder="Select primary tenant" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="unassigned">Unassigned</SelectItem>
-                      {tenants?.map(t => (
-                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                      {(selectedUser.enrolled_tenants || []).map(et => (
+                        <SelectItem key={et.tenant_id} value={et.tenant_id}>{et.tenant_name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">The primary tenant determines which tenant loads by default</p>
                 </div>
+
                 <div className="space-y-2">
                   <Label>Role</Label>
-                  <Select value={newUserRole} onValueChange={(v) => setNewUserRole(v as AppRole)}>
+                  <Select value={editRole} onValueChange={(v) => setEditRole(v as AppRole)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -463,8 +619,8 @@ export default function Admin() {
                   className="w-full" 
                   onClick={() => updateUserMutation.mutate({ 
                     userId: selectedUser.id, 
-                    tenantId: newUserTenant === 'unassigned' ? null : newUserTenant || null, 
-                    role: newUserRole 
+                    tenantId: editPrimaryTenant === 'unassigned' ? null : editPrimaryTenant || null, 
+                    role: editRole 
                   })}
                   disabled={updateUserMutation.isPending}
                 >

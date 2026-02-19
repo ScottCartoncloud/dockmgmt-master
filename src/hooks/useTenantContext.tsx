@@ -57,19 +57,47 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
             throw error;
           }
           setTenants(data || []);
-        } else if (profile?.tenant_id) {
-          // Regular users can only see their own tenant
-          const { data, error } = await supabase
-            .from('tenants')
-            .select('id, name')
-            .eq('id', profile.tenant_id)
-            .single();
+        } else if (user) {
+          // Regular users: fetch all tenants they're enrolled in via user_tenants
+          const { data: enrollments, error: enrollError } = await supabase
+            .from('user_tenants')
+            .select('tenant_id')
+            .eq('user_id', user.id);
           
-          if (error) {
-            if (isDev) console.error('[TenantContext] Error fetching tenant:', error.message);
-            throw error;
+          if (enrollError) {
+            if (isDev) console.error('[TenantContext] Error fetching enrollments:', enrollError.message);
+            throw enrollError;
           }
-          setTenants(data ? [data] : []);
+
+          if (enrollments && enrollments.length > 0) {
+            const tenantIds = enrollments.map(e => e.tenant_id);
+            const { data, error } = await supabase
+              .from('tenants')
+              .select('id, name')
+              .in('id', tenantIds)
+              .order('name');
+            
+            if (error) {
+              if (isDev) console.error('[TenantContext] Error fetching tenants:', error.message);
+              throw error;
+            }
+            setTenants(data || []);
+          } else if (profile?.tenant_id) {
+            // Fallback to profile.tenant_id if no enrollments exist yet
+            const { data, error } = await supabase
+              .from('tenants')
+              .select('id, name')
+              .eq('id', profile.tenant_id)
+              .single();
+            
+            if (error) {
+              if (isDev) console.error('[TenantContext] Error fetching tenant:', error.message);
+              throw error;
+            }
+            setTenants(data ? [data] : []);
+          } else {
+            setTenants([]);
+          }
         } else {
           setTenants([]);
         }
