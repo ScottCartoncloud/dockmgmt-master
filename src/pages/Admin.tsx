@@ -150,6 +150,18 @@ export default function Admin() {
   // Update user's primary tenant and role
   const updateUserMutation = useMutation({
     mutationFn: async ({ userId, tenantId, role }: { userId: string; tenantId: string | null; role: AppRole }) => {
+      // Prevent super_users from downgrading their own role
+      const { data: currentUser } = await supabase.auth.getUser();
+      if (currentUser?.user?.id === userId) {
+        const { data: currentRoles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId);
+        const wasSuperUser = currentRoles?.some(r => r.role === 'super_user');
+        if (wasSuperUser && role !== 'super_user') {
+          throw new Error('Cannot downgrade your own super_user role. Ask another super user to make this change.');
+        }
+      }
       // Update profile's primary tenant
       const { error: profileError } = await supabase
         .from('profiles')
