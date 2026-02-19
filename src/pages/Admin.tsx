@@ -201,7 +201,7 @@ export default function Admin() {
 
   const handleEditUser = (user: UserWithRole) => {
     setSelectedUser(user);
-    setNewUserTenant(user.tenant_id || '');
+    setNewUserTenant(user.tenant_id || 'unassigned');
     setNewUserRole(user.roles[0]?.role || 'viewer');
     setIsEditUserOpen(true);
   };
@@ -438,7 +438,7 @@ export default function Admin() {
                       <SelectValue placeholder="Select tenant" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Unassigned</SelectItem>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
                       {tenants?.map(t => (
                         <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                       ))}
@@ -463,7 +463,7 @@ export default function Admin() {
                   className="w-full" 
                   onClick={() => updateUserMutation.mutate({ 
                     userId: selectedUser.id, 
-                    tenantId: newUserTenant || null, 
+                    tenantId: newUserTenant === 'unassigned' ? null : newUserTenant || null, 
                     role: newUserRole 
                   })}
                   disabled={updateUserMutation.isPending}
