@@ -131,6 +131,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         
+        // Skip if initial session hasn't been handled yet - initializeAuth will handle it
+        if (!initialSessionHandled) return;
+        
         if (session?.user) {
           // Defer to avoid Supabase deadlock, but await fetchUserData
           setTimeout(async () => {
