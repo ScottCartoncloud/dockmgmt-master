@@ -121,29 +121,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchUserData]);
 
   useEffect(() => {
-    let initialLoad = true;
+    let isMounted = true;
+    let initialSessionHandled = false;
 
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        if (!isMounted) return;
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Defer profile fetch with setTimeout to avoid deadlock
         if (session?.user) {
+          // Defer to avoid Supabase deadlock, but await fetchUserData
           setTimeout(async () => {
+            if (!isMounted) return;
             await fetchUserData(session.user.id);
+            if (isMounted) setIsLoading(false);
             
-            // Only set loading false here for subsequent auth changes (not initial)
-            if (!initialLoad) {
-              // no-op, loading already false
-            }
-            
-            // Check for pending invite on SIGNED_IN event (OAuth redirect case)
             if (event === 'SIGNED_IN') {
               setTimeout(() => {
-                processPendingInvite(session.user);
-              }, 100); // Small delay to ensure profile is created first
+                if (isMounted) processPendingInvite(session.user);
+              }, 100);
             }
           }, 0);
         } else {
@@ -155,19 +153,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        await fetchUserData(session.user.id);
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!isMounted) return;
+        
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          await fetchUserData(session.user.id);
+        }
+      } finally {
+        if (isMounted) {
+          initialSessionHandled = true;
+          setIsLoading(false);
+        }
       }
-      
-      initialLoad = false;
-      setIsLoading(false);
-    });
+    };
 
-    return () => subscription.unsubscribe();
+    initializeAuth();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, [fetchUserData, processPendingInvite]);
 
   const signIn = async (email: string, password: string) => {
