@@ -36,6 +36,7 @@ export function TenantSwitcher() {
     setActiveTenant(tenant);
     setSearchQuery('');
     setOpen(false);
+    navigate('/');
   };
 
   const handleAdminClick = () => {
