@@ -26,16 +26,18 @@ const ACTIVE_TENANT_KEY = 'crossdock_active_tenant';
 const DEV_BYPASS_AUTH = false;
 
 export function TenantProvider({ children }: { children: React.ReactNode }) {
-  const { user, isSuperUser, profile } = useAuth();
+  const { user, isSuperUser, profile, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [activeTenant, setActiveTenantState] = useState<Tenant | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Fetch tenants based on user role
+  
+  // Fetch tenants based on user role - wait for auth to finish loading
   useEffect(() => {
     async function fetchTenants() {
-      // In dev mode, fetch all tenants even without a user
+      // Wait for auth to finish loading before making decisions based on roles
+      if (authLoading) return;
+      
       if (!user && !DEV_BYPASS_AUTH) {
         setTenants([]);
         setActiveTenantState(null);
@@ -110,7 +112,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     }
 
     fetchTenants();
-  }, [user, isSuperUser, profile?.tenant_id]);
+  }, [user, isSuperUser, profile?.tenant_id, authLoading]);
 
   // Restore active tenant from localStorage on mount
   useEffect(() => {
