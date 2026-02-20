@@ -205,7 +205,7 @@ const Index = () => {
           onAddBooking={handleAddBooking}
         />
         
-        <div className="flex-1 flex min-h-0">
+        <div className="flex-1 flex min-h-0 pl-4">
           <div className="flex-1 flex flex-col bg-card">
             {view === 'day' ? (
               <DayView
