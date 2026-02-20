@@ -121,6 +121,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchUserData]);
 
   useEffect(() => {
+    let initialLoad = true;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -129,8 +131,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         // Defer profile fetch with setTimeout to avoid deadlock
         if (session?.user) {
-          setTimeout(() => {
-            fetchUserData(session.user.id);
+          setTimeout(async () => {
+            await fetchUserData(session.user.id);
+            
+            // Only set loading false here for subsequent auth changes (not initial)
+            if (!initialLoad) {
+              // no-op, loading already false
+            }
             
             // Check for pending invite on SIGNED_IN event (OAuth redirect case)
             if (event === 'SIGNED_IN') {
@@ -142,21 +149,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           setProfile(null);
           setRoles([]);
+          setIsLoading(false);
         }
-        
-        setIsLoading(false);
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        fetchUserData(session.user.id);
+        await fetchUserData(session.user.id);
       }
       
+      initialLoad = false;
       setIsLoading(false);
     });
 
