@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { TenantSwitcher } from '@/components/TenantSwitcher';
 
@@ -34,7 +34,9 @@ const roleLabels: Record<string, string> = {
 
 export function Header() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, profile, roles, signOut, isAdmin, isSuperUser } = useAuth();
+  const isAdminRoute = location.pathname === '/admin';
 
   const primaryRole = roles[0]?.role || 'viewer';
   const displayName = profile?.full_name || user?.email || 'User';
@@ -78,63 +80,65 @@ export function Header() {
       </div>
 
       {/* Navigation - Centered */}
-      <nav className="flex items-center justify-center gap-2 px-4 py-2">
-        <Button 
-          variant="ghost" 
-          className="text-header-foreground hover:bg-header-foreground/10 gap-2"
-          onClick={() => navigate('/')}
-        >
-          <Truck className="w-4 h-4" />
-          Bookings
-        </Button>
-        
-        <span className="text-header-foreground/30">|</span>
-        
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="text-header-foreground hover:bg-header-foreground/10 gap-2">
-              <Settings className="w-4 h-4" />
-              Settings
-              <ChevronDown className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="center" className="w-56">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Configuration</DropdownMenuLabel>
-            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=docks')}>
-              <DoorOpen className="w-4 h-4" />
-              Dock Configuration
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=cards')}>
-              <LayoutGrid className="w-4 h-4" />
-              Card Configuration
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=carriers')}>
-              <Truck className="w-4 h-4" />
-              Carrier Management
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=integration')}>
-              <Link2 className="w-4 h-4" />
-              CartonCloud Integration
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Administration</DropdownMenuLabel>
-            {(isAdmin || isSuperUser) && (
-              <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=organisation')}>
-                <Building2 className="w-4 h-4" />
-                Organisation Settings
+      {!isAdminRoute && (
+        <nav className="flex items-center justify-center gap-2 px-4 py-2">
+          <Button 
+            variant="ghost" 
+            className="text-header-foreground hover:bg-header-foreground/10 gap-2"
+            onClick={() => navigate('/')}
+          >
+            <Truck className="w-4 h-4" />
+            Bookings
+          </Button>
+          
+          <span className="text-header-foreground/30">|</span>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="text-header-foreground hover:bg-header-foreground/10 gap-2">
+                <Settings className="w-4 h-4" />
+                Settings
+                <ChevronDown className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-56">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Configuration</DropdownMenuLabel>
+              <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=docks')}>
+                <DoorOpen className="w-4 h-4" />
+                Dock Configuration
               </DropdownMenuItem>
-            )}
-            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=users')}>
-              <Users className="w-4 h-4" />
-              User Management
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=defaults')}>
-              <Clock className="w-4 h-4" />
-              Booking Defaults
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </nav>
+              <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=cards')}>
+                <LayoutGrid className="w-4 h-4" />
+                Card Configuration
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=carriers')}>
+                <Truck className="w-4 h-4" />
+                Carrier Management
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=integration')}>
+                <Link2 className="w-4 h-4" />
+                CartonCloud Integration
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Administration</DropdownMenuLabel>
+              {(isAdmin || isSuperUser) && (
+                <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=organisation')}>
+                  <Building2 className="w-4 h-4" />
+                  Organisation Settings
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=users')}>
+                <Users className="w-4 h-4" />
+                User Management
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=defaults')}>
+                <Clock className="w-4 h-4" />
+                Booking Defaults
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </nav>
+      )}
     </header>
   );
 }
