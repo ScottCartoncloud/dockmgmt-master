@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown, Search, Truck, Shield, Check } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -15,10 +15,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 export function TenantSwitcher() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { tenants, activeTenant, setActiveTenant, isLoading } = useTenantContext();
   const { isSuperUser, isAdmin } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [open, setOpen] = useState(false);
+  const isAdminRoute = location.pathname === '/admin';
 
   const filteredTenants = tenants.filter(tenant =>
     tenant.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -46,13 +48,13 @@ export function TenantSwitcher() {
     return (
       <div className="flex items-center gap-2 px-2">
         <div className="w-8 h-8 bg-accent rounded flex items-center justify-center">
-          <Truck className="w-5 h-5 text-accent-foreground" />
+          {isAdminRoute ? <Shield className="w-5 h-5 text-accent-foreground" /> : <Truck className="w-5 h-5 text-accent-foreground" />}
         </div>
         <div className="flex flex-col items-start">
           <span className="font-semibold text-lg text-header-foreground leading-tight">
-            {activeTenant?.name || 'Dock Management'}
+            {isAdminRoute ? 'Administration' : (activeTenant?.name || 'Dock Management')}
           </span>
-          {activeTenant && (
+          {!isAdminRoute && activeTenant && (
             <span className="text-[10px] text-header-foreground/60 leading-tight">
               Dock Management
             </span>
@@ -70,13 +72,13 @@ export function TenantSwitcher() {
           className="flex items-center gap-2 hover:bg-header-foreground/10 px-2"
         >
           <div className="w-8 h-8 bg-accent rounded flex items-center justify-center">
-            <Truck className="w-5 h-5 text-accent-foreground" />
+            {isAdminRoute ? <Shield className="w-5 h-5 text-accent-foreground" /> : <Truck className="w-5 h-5 text-accent-foreground" />}
           </div>
           <div className="flex flex-col items-start">
             <span className="font-semibold text-lg text-header-foreground leading-tight">
-              {activeTenant?.name || 'Dock Management'}
+              {isAdminRoute ? 'Administration' : (activeTenant?.name || 'Dock Management')}
             </span>
-            {activeTenant && (
+            {!isAdminRoute && activeTenant && (
               <span className="text-[10px] text-header-foreground/60 leading-tight">
                 Dock Management
               </span>
