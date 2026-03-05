@@ -27,7 +27,7 @@ const ALLOWED_ORIGINS = [
 
 function getCorsHeaders(origin: string | null): Record<string, string> {
   const allowedOrigin = origin && ALLOWED_ORIGINS.some(allowed => 
-    origin === allowed || origin.endsWith('.lovableproject.com')
+    origin === allowed || origin.endsWith('.lovableproject.com') || origin.endsWith('.lovable.app')
   ) ? origin : ALLOWED_ORIGINS[0] || "*";
   
   return {
