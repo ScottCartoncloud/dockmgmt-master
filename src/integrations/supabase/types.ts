@@ -629,6 +629,10 @@ export type Database = {
         Returns: boolean
       }
       is_super_user: { Args: { _user_id: string }; Returns: boolean }
+      is_user_in_tenant: {
+        Args: { _tenant_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "operator" | "viewer" | "super_user"
