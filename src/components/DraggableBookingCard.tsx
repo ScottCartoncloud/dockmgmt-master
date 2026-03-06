@@ -129,6 +129,12 @@ export function DraggableBookingCard({
 
   const displayEndTime = resizePreview || booking.endTime;
 
+  // Calculate duration to detect short bookings
+  const [startH, startM] = booking.startTime.split(':').map(Number);
+  const [endH, endM] = displayEndTime.split(':').map(Number);
+  const durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+  const isShort = durationMinutes <= 30 && !compact;
+
   // Determine background color - use dock color if provided, otherwise status-based
   const bgStyle = dockColor
     ? { backgroundColor: `${dockColor}20` }
@@ -146,120 +152,148 @@ export function DraggableBookingCard({
   const hasCartonCloudPO = isValidLinkedPO(booking.cartonCloudPO);
 
   return (
-    <div
-      ref={cardRef}
-      draggable={!isResizing}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onClick={(e) => {
-        if (!isResizing) {
-          e.stopPropagation();
-          onClick(booking);
-        }
-      }}
-      className={cn(
-        'rounded-md p-2 border-l-4 cursor-grab transition-shadow duration-200 hover:shadow-card-hover relative group h-full overflow-hidden',
-        statusBorderColors[booking.status],
-        bgClass,
-        compact ? 'text-xs' : 'text-sm',
-        isResizing && 'cursor-ns-resize'
-      )}
-      style={bgStyle}
-    >
-      {/* Top-right icons container */}
-      <div className="absolute top-1 right-1 flex items-center gap-1">
-        {/* CartonCloud linked indicator */}
-        {hasCartonCloudPO && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
+    <TooltipProvider delayDuration={300}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            ref={cardRef}
+            draggable={!isResizing}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onClick={(e) => {
+              if (!isResizing) {
+                e.stopPropagation();
+                onClick(booking);
+              }
+            }}
+            className={cn(
+              'rounded-md p-2 border-l-4 cursor-grab transition-shadow duration-200 hover:shadow-card-hover relative group h-full overflow-hidden',
+              statusBorderColors[booking.status],
+              bgClass,
+              compact ? 'text-xs' : 'text-sm',
+              isResizing && 'cursor-ns-resize'
+            )}
+            style={bgStyle}
+          >
+            {/* Top-right icons container */}
+            <div className="absolute top-1 right-1 flex items-center gap-1">
+              {hasCartonCloudPO && (
                 <img 
                   src={cartonCloudLogo} 
                   alt="CartonCloud" 
                   className="w-4 h-4 object-contain"
                 />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Linked to CartonCloud PO</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+              )}
+              <div className="opacity-0 group-hover:opacity-60 transition-opacity">
+                <GripVertical className="w-3 h-3 text-muted-foreground" />
+              </div>
+            </div>
+
+            {isShort ? (
+              /* Short booking: single-line condensed layout */
+              <>
+                <div className="flex items-center gap-1 truncate pr-8">
+                  <span className="font-medium text-foreground truncate">{booking.title}</span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="text-muted-foreground whitespace-nowrap">{booking.startTime} - {displayEndTime}</span>
+                </div>
+                {onResize && (
+                  <div
+                    onMouseDown={handleResizeStart}
+                    className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize bg-transparent hover:bg-accent/20 transition-colors rounded-b-md"
+                    title="Drag to resize"
+                  />
+                )}
+              </>
+            ) : (
+              /* Normal layout */
+              <>
+                <div className="font-medium text-foreground truncate pr-8">{booking.title}</div>
+                
+                {!compact && (
+                  <>
+                    <div className="flex items-center gap-1 mt-1 text-muted-foreground">
+                      <Clock className="w-3 h-3" />
+                      <span>{booking.startTime} - {displayEndTime}</span>
+                    </div>
+                    
+                    {booking.carrier && (
+                      <div className="flex items-center gap-1 mt-1 text-muted-foreground">
+                        <Truck className="w-3 h-3" />
+                        <span className="truncate">{booking.carrier}</span>
+                      </div>
+                    )}
+
+                    {booking.pallets !== undefined && booking.pallets > 0 && (
+                      <div className="flex items-center gap-1 mt-1 text-muted-foreground">
+                        <Layers className="w-3 h-3" />
+                        <span>{booking.pallets} pallet{booking.pallets !== 1 ? 's' : ''}</span>
+                      </div>
+                    )}
+                    
+                    {booking.cartonCloudPO?.reference && (
+                      <div className="flex items-center gap-1 mt-1 text-accent">
+                        <Package className="w-3 h-3" />
+                        <span>PO: {booking.cartonCloudPO.reference}</span>
+                      </div>
+                    )}
+                    
+                    {booking.dockNumber && showDockBadge && (
+                      <div className="mt-2 inline-block px-2 py-0.5 bg-primary/10 text-primary text-xs rounded">
+                        Dock {booking.dockNumber}
+                      </div>
+                    )}
+
+                    {onResize && (
+                      <div
+                        onMouseDown={handleResizeStart}
+                        className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize bg-transparent hover:bg-accent/20 transition-colors rounded-b-md"
+                        title="Drag to resize"
+                      />
+                    )}
+                  </>
+                )}
+                
+                {compact && (
+                  <>
+                    <div className="text-muted-foreground mt-0.5">
+                      {booking.startTime} - {displayEndTime}
+                    </div>
+                    {onResize && (
+                      <div
+                        onMouseDown={handleResizeStart}
+                        className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize bg-transparent hover:bg-accent/20 transition-colors rounded-b-md"
+                        title="Drag to resize"
+                      />
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
+            {isResizing && resizePreview && (
+              <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-foreground text-background text-xs px-2 py-1 rounded shadow-lg z-50 whitespace-nowrap">
+                {booking.startTime} - {resizePreview}
+              </div>
+            )}
+          </div>
+        </TooltipTrigger>
+        {isShort && (
+          <TooltipContent side="right" className="max-w-xs">
+            <div className="space-y-1">
+              <p className="font-medium">{booking.title}</p>
+              <p className="text-xs">{booking.startTime} - {displayEndTime}</p>
+              {booking.carrier && <p className="text-xs">Carrier: {booking.carrier}</p>}
+              {booking.pallets !== undefined && booking.pallets > 0 && (
+                <p className="text-xs">{booking.pallets} pallet{booking.pallets !== 1 ? 's' : ''}</p>
+              )}
+              {booking.cartonCloudPO?.reference && (
+                <p className="text-xs">PO: {booking.cartonCloudPO.reference}</p>
+              )}
+            </div>
+          </TooltipContent>
         )}
-        {/* Drag handle indicator */}
-        <div className="opacity-0 group-hover:opacity-60 transition-opacity">
-          <GripVertical className="w-3 h-3 text-muted-foreground" />
-        </div>
-      </div>
-
-      <div className="font-medium text-foreground truncate pr-8">{booking.title}</div>
-      
-      {!compact && (
-        <>
-          <div className="flex items-center gap-1 mt-1 text-muted-foreground">
-            <Clock className="w-3 h-3" />
-            <span>{booking.startTime} - {displayEndTime}</span>
-          </div>
-          
-          {booking.carrier && (
-            <div className="flex items-center gap-1 mt-1 text-muted-foreground">
-              <Truck className="w-3 h-3" />
-              <span className="truncate">{booking.carrier}</span>
-            </div>
-          )}
-
-          {booking.pallets !== undefined && booking.pallets > 0 && (
-            <div className="flex items-center gap-1 mt-1 text-muted-foreground">
-              <Layers className="w-3 h-3" />
-              <span>{booking.pallets} pallet{booking.pallets !== 1 ? 's' : ''}</span>
-            </div>
-          )}
-          
-          {booking.cartonCloudPO?.reference && (
-            <div className="flex items-center gap-1 mt-1 text-accent">
-              <Package className="w-3 h-3" />
-              <span>PO: {booking.cartonCloudPO.reference}</span>
-            </div>
-          )}
-          
-          {booking.dockNumber && showDockBadge && (
-            <div className="mt-2 inline-block px-2 py-0.5 bg-primary/10 text-primary text-xs rounded">
-              Dock {booking.dockNumber}
-            </div>
-          )}
-
-          {/* Resize handle */}
-          {onResize && (
-            <div
-              onMouseDown={handleResizeStart}
-              className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize bg-transparent hover:bg-accent/20 transition-colors rounded-b-md"
-              title="Drag to resize"
-            />
-          )}
-        </>
-      )}
-      
-      {compact && (
-        <>
-          <div className="text-muted-foreground mt-0.5">
-            {booking.startTime} - {displayEndTime}
-          </div>
-          {/* Resize handle for compact view */}
-          {onResize && (
-            <div
-              onMouseDown={handleResizeStart}
-              className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize bg-transparent hover:bg-accent/20 transition-colors rounded-b-md"
-              title="Drag to resize"
-            />
-          )}
-        </>
-      )}
-
-      {/* Resize preview indicator */}
-      {isResizing && resizePreview && (
-        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-foreground text-background text-xs px-2 py-1 rounded shadow-lg z-50 whitespace-nowrap">
-          {booking.startTime} - {resizePreview}
-        </div>
-      )}
-    </div>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
