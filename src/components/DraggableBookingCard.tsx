@@ -129,6 +129,12 @@ export function DraggableBookingCard({
 
   const displayEndTime = resizePreview || booking.endTime;
 
+  // Calculate duration to detect short bookings
+  const [startH, startM] = booking.startTime.split(':').map(Number);
+  const [endH, endM] = displayEndTime.split(':').map(Number);
+  const durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+  const isShort = durationMinutes <= 30 && !compact;
+
   // Determine background color - use dock color if provided, otherwise status-based
   const bgStyle = dockColor
     ? { backgroundColor: `${dockColor}20` }
