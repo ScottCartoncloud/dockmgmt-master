@@ -279,7 +279,7 @@ export function DraggableBookingCard({
           </div>
         </TooltipTrigger>
         {isShort && (
-          <TooltipContent side="right" className="max-w-xs">
+          <TooltipContent side="right" className="max-w-xs z-[100]">
             <div className="space-y-1">
               <p className="font-medium">{booking.title}</p>
               <p className="text-xs">{booking.startTime} - {displayEndTime}</p>
