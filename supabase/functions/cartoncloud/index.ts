@@ -437,14 +437,25 @@ serve(async (req) => {
      console.log('CartonCloud function called with action:', action);
 
      const requestedTenantId = typeof appTenantId === 'string' ? appTenantId : null;
-     const effectiveTenantId = requestedTenantId && authz.isSuperUser ? requestedTenantId : userTenantId;
 
-     if (requestedTenantId && !authz.isSuperUser && userTenantId !== requestedTenantId) {
-       return new Response(
-         JSON.stringify({ error: 'Insufficient permissions for selected tenant' }),
-         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-       );
+     // Check tenant membership via user_tenants table (not just profile.tenant_id)
+     if (requestedTenantId && !authz.isSuperUser) {
+       const { data: enrollment } = await supabaseClient
+         .from('user_tenants')
+         .select('id')
+         .eq('user_id', user.id)
+         .eq('tenant_id', requestedTenantId)
+         .maybeSingle();
+
+       if (!enrollment) {
+         return new Response(
+           JSON.stringify({ error: 'Insufficient permissions for selected tenant' }),
+           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+         );
+       }
      }
+
+     const effectiveTenantId = requestedTenantId ?? userTenantId;
 
     if (action && typeof action !== 'string') {
       return new Response(

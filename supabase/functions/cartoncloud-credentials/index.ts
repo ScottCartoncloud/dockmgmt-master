@@ -265,14 +265,24 @@ serve(async (req) => {
     const requestedTenantId =
       typeof rawBody?.appTenantId === 'string' ? rawBody.appTenantId : null;
 
-    if (requestedTenantId && !isSuperUser && userTenantId !== requestedTenantId) {
-      return new Response(
-        JSON.stringify({ error: 'Insufficient permissions for selected tenant' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Check tenant membership via user_tenants table (not just profile.tenant_id)
+    if (requestedTenantId && !isSuperUser) {
+      const { data: enrollment } = await supabaseClient
+        .from('user_tenants')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('tenant_id', requestedTenantId)
+        .maybeSingle();
+
+      if (!enrollment) {
+        return new Response(
+          JSON.stringify({ error: 'Insufficient permissions for selected tenant' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
-    const effectiveTenantId = requestedTenantId && isSuperUser ? requestedTenantId : userTenantId;
+    const effectiveTenantId = requestedTenantId ?? userTenantId;
 
     if (action === 'save') {
       const parseResult = saveCredentialsSchema.safeParse(rawBody);

@@ -119,6 +119,14 @@ export function UserManagement() {
     mutationFn: async ({ name, email, role }: { name: string; email: string; role: AppRole }) => {
       if (!activeTenant?.id) throw new Error('No tenant selected');
 
+      // Delete any existing pending invite for this email+tenant to avoid unique constraint violation
+      await supabase
+        .from('tenant_invites')
+        .delete()
+        .eq('tenant_id', activeTenant.id)
+        .eq('email', email)
+        .is('accepted_at', null);
+
       // Create invite record and get the ID
       const { data: invite, error } = await supabase
         .from('tenant_invites')
