@@ -390,7 +390,7 @@ export function UserManagement() {
       </div>
 
       {/* Pending Invites Section */}
-      <PendingInvites tenantId={activeTenant.id} canManage={canManageUsers} />
+      <PendingInvites tenantId={activeTenant.id} canManage={canManageUsers} currentUser={currentUser} />
 
       {/* Add User Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
