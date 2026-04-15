@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Users, Search, Plus, Pencil, Mail, Loader2, UserPlus } from 'lucide-react';
+import { Users, Search, Plus, Pencil, Mail, Loader2, UserPlus, RefreshCw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 type AppRole = 'admin' | 'operator' | 'viewer';
