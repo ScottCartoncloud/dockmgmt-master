@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Users, Search, Plus, Pencil, Mail, Loader2, UserPlus } from 'lucide-react';
+import { Users, Search, Plus, Pencil, Mail, Loader2, UserPlus, RefreshCw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 type AppRole = 'admin' | 'operator' | 'viewer';
@@ -390,7 +390,7 @@ export function UserManagement() {
       </div>
 
       {/* Pending Invites Section */}
-      <PendingInvites tenantId={activeTenant.id} canManage={canManageUsers} />
+      <PendingInvites tenantId={activeTenant.id} canManage={canManageUsers} currentUser={currentUser} />
 
       {/* Add User Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
@@ -539,8 +539,9 @@ export function UserManagement() {
 }
 
 // Pending Invites Component
-function PendingInvites({ tenantId, canManage }: { tenantId: string; canManage: boolean }) {
+function PendingInvites({ tenantId, canManage, currentUser }: { tenantId: string; canManage: boolean; currentUser: any }) {
   const queryClient = useQueryClient();
+  const [resendingId, setResendingId] = useState<string | null>(null);
 
   const { data: invites = [] } = useQuery({
     queryKey: ['tenant-invites', tenantId],
@@ -575,6 +576,37 @@ function PendingInvites({ tenantId, canManage }: { tenantId: string; canManage: 
     },
   });
 
+  const handleResend = async (invite: { id: string; email: string; role: string }) => {
+    setResendingId(invite.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-invite-email', {
+        body: {
+          email: invite.email,
+          inviteToken: invite.id,
+          tenantId,
+          role: roleLabels[invite.role as AppRole] || invite.role,
+          invitedByName: currentUser?.user_metadata?.full_name || currentUser?.email || undefined,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({
+        title: 'Invite Resent',
+        description: `Invitation email resent to ${invite.email}.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Failed to Resend',
+        description: err.message || 'Could not resend the invitation email.',
+        variant: 'destructive',
+      });
+    } finally {
+      setResendingId(null);
+    }
+  };
+
   if (invites.length === 0) return null;
 
   return (
@@ -597,14 +629,30 @@ function PendingInvites({ tenantId, canManage }: { tenantId: string; canManage: 
               </div>
             </div>
             {canManage && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => deleteInviteMutation.mutate(invite.id)}
-                disabled={deleteInviteMutation.isPending}
-              >
-                Cancel
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => handleResend(invite)}
+                  disabled={resendingId === invite.id}
+                >
+                  {resendingId === invite.id ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  )}
+                  Resend
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => deleteInviteMutation.mutate(invite.id)}
+                  disabled={deleteInviteMutation.isPending}
+                >
+                  Cancel
+                </Button>
+              </div>
             )}
           </div>
         ))}
