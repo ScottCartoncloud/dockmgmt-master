@@ -138,13 +138,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { email, inviteToken, tenantId, role, invitedByName } = parseResult.data;
 
-    // Get user's profile and roles for authorization
-    const { data: profile } = await supabaseClient
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single();
-
+    // Get user's roles for authorization
     const { data: roles } = await supabaseClient
       .from('user_roles')
       .select('role')
@@ -161,13 +155,26 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Verify user can invite for this tenant (super_user can invite anywhere)
-    if (!userRoles.includes('super_user') && profile?.tenant_id !== tenantId) {
-      console.log('Tenant mismatch - user tenant:', profile?.tenant_id, 'requested tenant:', tenantId);
-      return new Response(
-        JSON.stringify({ error: 'Cannot send invites for other tenants' }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    // Verify user can invite for this tenant via user_tenants (not profile.tenant_id)
+    if (!userRoles.includes('super_user')) {
+      const serviceClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       );
+      const { data: enrollment } = await serviceClient
+        .from('user_tenants')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+
+      if (!enrollment) {
+        console.log('User not enrolled in tenant:', tenantId);
+        return new Response(
+          JSON.stringify({ error: 'Cannot send invites for other tenants' }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Fetch tenant name from database
