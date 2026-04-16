@@ -269,6 +269,19 @@ export function CartonCloudIntegration() {
         Connect your CartonCloud account to link Purchase Orders with cross-dock bookings.
       </p>
 
+      {settings && (settings.cartoncloud_tenant_name || settings.cartoncloud_tenant_slug) && (
+        <div className="p-3 bg-accent/5 border border-accent/20 rounded-md text-sm">
+          <div className="font-medium text-foreground">
+            {settings.cartoncloud_tenant_name ?? 'CartonCloud workspace'}
+          </div>
+          {settings.cartoncloud_tenant_slug && (
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Slug: <code className="font-mono">{settings.cartoncloud_tenant_slug}</code> · used for "View in CartonCloud" links on bookings
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="space-y-4">
         {hasCredentialsSaved && !isEditingCredentials ? (
           <>
