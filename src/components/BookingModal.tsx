@@ -120,11 +120,31 @@ export function BookingModal({
     }
   }, [isCartonCloudConnected, mutateSearchOrders]);
 
+  const performSoSearch = useCallback((term: string) => {
+    if (term.length >= 2 && isCartonCloudConnected) {
+      mutateSearchSOs(term, {
+        onSuccess: (results) => {
+          setSoSearchResults(results);
+        },
+        onError: () => {
+          setSoSearchResults([]);
+        },
+      });
+    } else {
+      setSoSearchResults([]);
+    }
+  }, [isCartonCloudConnected, mutateSearchSOs]);
+
   const debouncedSearch = useDebouncedCallback(performPoSearch, 300);
+  const debouncedSoSearch = useDebouncedCallback(performSoSearch, 300);
 
   useEffect(() => {
     debouncedSearch(searchTerm);
   }, [searchTerm, debouncedSearch]);
+
+  useEffect(() => {
+    debouncedSoSearch(soSearchTerm);
+  }, [soSearchTerm, debouncedSoSearch]);
 
   useEffect(() => {
     if (booking) {
@@ -136,14 +156,15 @@ export function BookingModal({
       setCarrierName(booking.carrier);
       setSelectedCarrierId(booking.carrierId || null);
       setTruckRego(booking.truckRego || '');
-      // Find dock ID from booking's dock_door_id
       setSelectedDockId(booking.dockDoorId || '');
       setNotes(booking.notes || '');
       setStatus(booking.status);
       setSelectedPO(booking.cartonCloudPO || null);
+      setSelectedSO(booking.cartonCloudSO || null);
+      // Detect order type from saved data
+      setOrderType(booking.cartonCloudSO ? 'outbound' : 'inbound');
       setCustomFieldValues(booking.customFields || {});
     } else {
-      // Reset form for new booking
       setTitle('');
       setPallets('');
       setDate(defaultDate ? format(defaultDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'));
@@ -152,7 +173,6 @@ export function BookingModal({
       setCarrierName('');
       setSelectedCarrierId(null);
       setTruckRego('');
-      // Find dock ID from defaultDockNumber
       const defaultDock = defaultDockNumber ? activeDocks.find(d => {
         const num = parseInt(d.name.replace(/\D/g, ''), 10);
         return num === defaultDockNumber;
@@ -161,10 +181,14 @@ export function BookingModal({
       setNotes('');
       setStatus('scheduled');
       setSelectedPO(null);
+      setSelectedSO(null);
+      setOrderType('inbound');
       setCustomFieldValues({});
     }
     setSearchTerm('');
     setSearchResults([]);
+    setSoSearchTerm('');
+    setSoSearchResults([]);
     setCarrierSearchTerm('');
   }, [booking, defaultDate, defaultHour, defaultDockNumber, open, activeDocks]);
 
