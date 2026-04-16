@@ -551,15 +551,33 @@ export function BookingModal({
                         {selectedSO.deliveryDate && ` • Delivery: ${selectedSO.deliveryDate}`}
                       </div>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedSO(null)}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {(() => {
+                        const url = buildCartonCloudAppUrl(cartonCloudSettings, 'SaleOrders', selectedSO.numericId);
+                        return url ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            title="View in CartonCloud"
+                          >
+                            <a href={url} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          </Button>
+                        ) : null;
+                      })()}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedSO(null)}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 )}
               </>
