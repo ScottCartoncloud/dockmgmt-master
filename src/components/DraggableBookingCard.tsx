@@ -148,8 +148,8 @@ export function DraggableBookingCard({
       : 'bg-booking'
     : '';
 
-  // Only show CartonCloud icon when cartonCloudPO is linked (not local purchaseOrder)
-  const hasCartonCloudPO = isValidLinkedPO(booking.cartonCloudPO);
+  // Show CartonCloud icon when PO or SO is linked
+  const hasCartonCloudLink = isValidLinkedPO(booking.cartonCloudPO) || isValidLinkedPO(booking.cartonCloudSO);
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -177,7 +177,7 @@ export function DraggableBookingCard({
           >
             {/* Top-right icons container */}
             <div className="absolute top-1 right-1 flex items-center gap-1">
-              {hasCartonCloudPO && (
+              {hasCartonCloudLink && (
                 <img 
                   src={cartonCloudLogo} 
                   alt="CartonCloud" 
@@ -237,6 +237,13 @@ export function DraggableBookingCard({
                         <span>PO: {booking.cartonCloudPO.reference}</span>
                       </div>
                     )}
+
+                    {booking.cartonCloudSO?.reference && (
+                      <div className="flex items-center gap-1 mt-1 text-accent">
+                        <Package className="w-3 h-3" />
+                        <span>SO: {booking.cartonCloudSO.reference}</span>
+                      </div>
+                    )}
                     
                     {booking.dockNumber && showDockBadge && (
                       <div className="mt-2 inline-block px-2 py-0.5 bg-primary/10 text-primary text-xs rounded">
@@ -289,6 +296,9 @@ export function DraggableBookingCard({
               )}
               {booking.cartonCloudPO?.reference && (
                 <p className="text-xs">PO: {booking.cartonCloudPO.reference}</p>
+              )}
+              {booking.cartonCloudSO?.reference && (
+                <p className="text-xs">SO: {booking.cartonCloudSO.reference}</p>
               )}
             </div>
           </TooltipContent>
