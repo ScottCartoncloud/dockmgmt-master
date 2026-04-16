@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantContext } from '@/hooks/useTenantContext';
-import { CrossDockBooking, PurchaseOrder, CartonCloudPO, CustomFieldValues } from '@/types/booking';
+import { CrossDockBooking, PurchaseOrder, CartonCloudPO, CartonCloudSO, CustomFieldValues } from '@/types/booking';
 import { useEffect } from 'react';
 import { Json } from '@/integrations/supabase/types';
 import { format, parse } from 'date-fns';
@@ -75,6 +75,8 @@ const rowToBooking = (row: {
     purchaseOrderId: row.purchase_order_id || undefined,
     purchaseOrder: row.purchase_order as unknown as PurchaseOrder | undefined,
     cartonCloudPO: row.cartoncloud_po as unknown as CartonCloudPO | undefined,
+    salesOrderId: (row as any).sales_order_id || undefined,
+    cartonCloudSO: (row as any).cartoncloud_so as unknown as CartonCloudSO | undefined,
     notes: row.notes || undefined,
     status: row.status as CrossDockBooking['status'],
     createdBy: row.created_by || 'unknown',
@@ -171,11 +173,13 @@ export const useCreateBooking = () => {
           purchase_order_id: booking.purchaseOrderId || null,
           purchase_order: booking.purchaseOrder as unknown as Json || null,
           cartoncloud_po: booking.cartonCloudPO as unknown as Json || null,
+          sales_order_id: booking.salesOrderId || null,
+          cartoncloud_so: booking.cartonCloudSO as unknown as Json || null,
           notes: booking.notes || null,
           status: booking.status || 'scheduled',
           custom_fields: booking.customFields as unknown as Json || {},
           created_by: userData.user?.id || null,
-        })
+        } as any)
         .select()
         .single();
 
@@ -210,6 +214,8 @@ export const useUpdateBooking = () => {
       if (booking.purchaseOrderId !== undefined) updateData.purchase_order_id = booking.purchaseOrderId || null;
       if (booking.purchaseOrder !== undefined) updateData.purchase_order = booking.purchaseOrder || null;
       if (booking.cartonCloudPO !== undefined) updateData.cartoncloud_po = booking.cartonCloudPO || null;
+      if (booking.salesOrderId !== undefined) updateData.sales_order_id = booking.salesOrderId || null;
+      if (booking.cartonCloudSO !== undefined) updateData.cartoncloud_so = booking.cartonCloudSO || null;
       if (booking.notes !== undefined) updateData.notes = booking.notes || null;
       if (booking.status !== undefined) updateData.status = booking.status;
       if (booking.customFields !== undefined) updateData.custom_fields = booking.customFields || {};

@@ -38,6 +38,17 @@ export interface CartonCloudPO {
   items?: CartonCloudPOItem[];
 }
 
+export interface CartonCloudSO {
+  id: string;
+  reference: string;
+  customer: string;
+  status: string;
+  deliveryDate: string | null;
+  itemCount: number;
+  warehouseName: string;
+  numericId?: string | null;
+}
+
 // Custom field values stored as key-value pairs
 export type CustomFieldValues = Record<string, string | string[] | Date | null>;
 
@@ -56,6 +67,8 @@ export interface CrossDockBooking {
   purchaseOrderId?: string;
   purchaseOrder?: PurchaseOrder;
   cartonCloudPO?: CartonCloudPO;
+  salesOrderId?: string;
+  cartonCloudSO?: CartonCloudSO;
   notes?: string;
   status: 'scheduled' | 'arrived' | 'in_progress' | 'completed' | 'cancelled';
   createdBy: string;
