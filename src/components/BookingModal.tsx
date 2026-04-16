@@ -81,12 +81,18 @@ export function BookingModal({
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<CartonCloudPO[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<CustomFieldValues>({});
+  const [orderType, setOrderType] = useState<'inbound' | 'outbound'>('inbound');
+  const [selectedSO, setSelectedSO] = useState<CartonCloudSO | null>(null);
+  const [soSearchOpen, setSoSearchOpen] = useState(false);
+  const [soSearchTerm, setSoSearchTerm] = useState('');
+  const [soSearchResults, setSoSearchResults] = useState<CartonCloudSOResult[]>([]);
 
   const { data: cartonCloudSettings } = useCartonCloudSettings();
   const { data: dockDoors } = useDockDoors();
   const { data: customFields } = useActiveCustomBookingFields();
   const { carriers } = useCarriers();
   const { mutate: mutateSearchOrders, isPending: isSearchPending } = useSearchCartonCloudOrders();
+  const { mutate: mutateSearchSOs, isPending: isSOSearchPending } = useSearchCartonCloudSOs();
   const isCartonCloudConnected = !!cartonCloudSettings;
   const activeDocks = useMemo(() => (dockDoors || []).filter((d) => d.is_active), [dockDoors]);
   
