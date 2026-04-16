@@ -273,7 +273,7 @@ export function DayView({
 
   return (
     <div className="flex-1 overflow-auto">
-      <div style={{ minWidth: Math.max(500, activeDocks.length * MIN_DOCK_WIDTH + 60) }}>
+      <div style={{ minWidth: Math.max(500, (activeDocks.length + (unassignedBookings.length > 0 ? 1 : 0)) * MIN_DOCK_WIDTH + 60) }}>
         {/* Header with dock columns */}
         <div className="sticky top-0 z-20 bg-card border-b border-border">
           <div className="flex">
