@@ -136,7 +136,14 @@ export function DockConfiguration() {
                   className="w-6 h-6 rounded-md shadow-sm border border-border/50"
                   style={{ backgroundColor: dock.color }}
                 />
-                <span className="font-medium text-foreground">{dock.name}</span>
+                <div>
+                  <span className="font-medium text-foreground">{dock.name}</span>
+                  {dock.warehouse_id && (
+                    <span className="text-xs text-muted-foreground ml-2">
+                      {warehouses.find(w => w.id === dock.warehouse_id)?.name}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -193,6 +200,25 @@ export function DockConfiguration() {
                 maxLength={50}
                 required
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dock-warehouse">Warehouse</Label>
+              <Select
+                value={formData.warehouse_id}
+                onValueChange={(value) => setFormData({ ...formData, warehouse_id: value })}
+              >
+                <SelectTrigger id="dock-warehouse">
+                  <SelectValue placeholder="Select a warehouse" />
+                </SelectTrigger>
+                <SelectContent>
+                  {warehouses.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
