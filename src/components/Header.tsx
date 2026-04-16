@@ -9,7 +9,8 @@ import {
   Clock,
   LogOut,
   Truck,
-  Building2
+  Building2,
+  Warehouse
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -114,6 +115,10 @@ export function Header() {
               <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=carriers')}>
                 <Truck className="w-4 h-4" />
                 Carrier Management
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=warehouses')}>
+                <Warehouse className="w-4 h-4" />
+                Warehouse Management
               </DropdownMenuItem>
               <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=integration')}>
                 <Link2 className="w-4 h-4" />
