@@ -216,6 +216,8 @@ export type Database = {
         Row: {
           api_base_url: string
           cartoncloud_tenant_id: string
+          cartoncloud_tenant_name: string | null
+          cartoncloud_tenant_slug: string | null
           client_id: string
           client_secret: string
           created_at: string
@@ -227,6 +229,8 @@ export type Database = {
         Insert: {
           api_base_url?: string
           cartoncloud_tenant_id: string
+          cartoncloud_tenant_name?: string | null
+          cartoncloud_tenant_slug?: string | null
           client_id: string
           client_secret: string
           created_at?: string
@@ -238,6 +242,8 @@ export type Database = {
         Update: {
           api_base_url?: string
           cartoncloud_tenant_id?: string
+          cartoncloud_tenant_name?: string | null
+          cartoncloud_tenant_slug?: string | null
           client_id?: string
           client_secret?: string
           created_at?: string
@@ -627,6 +633,8 @@ export type Database = {
         Row: {
           api_base_url: string | null
           cartoncloud_tenant_id: string | null
+          cartoncloud_tenant_name: string | null
+          cartoncloud_tenant_slug: string | null
           created_at: string | null
           has_credentials: boolean | null
           id: string | null
@@ -637,6 +645,8 @@ export type Database = {
         Insert: {
           api_base_url?: string | null
           cartoncloud_tenant_id?: string | null
+          cartoncloud_tenant_name?: string | null
+          cartoncloud_tenant_slug?: string | null
           created_at?: string | null
           has_credentials?: never
           id?: string | null
@@ -647,6 +657,8 @@ export type Database = {
         Update: {
           api_base_url?: string | null
           cartoncloud_tenant_id?: string | null
+          cartoncloud_tenant_name?: string | null
+          cartoncloud_tenant_slug?: string | null
           created_at?: string | null
           has_credentials?: never
           id?: string | null
