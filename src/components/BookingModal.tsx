@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { useSearchCartonCloudOrders, useSearchCartonCloudSOs, useCartonCloudSettings } from '@/hooks/useCartonCloudSettings';
+import { useSearchCartonCloudOrders, useSearchCartonCloudSOs, useCartonCloudSettings, buildCartonCloudAppUrl } from '@/hooks/useCartonCloudSettings';
 import { CartonCloudSOResult } from '@/hooks/useCartonCloudSettings';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 import { useDockDoors } from '@/hooks/useDockDoors';
