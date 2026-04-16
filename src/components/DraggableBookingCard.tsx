@@ -152,7 +152,7 @@ export function DraggableBookingCard({
   const hasCartonCloudLink = isValidLinkedPO(booking.cartonCloudPO) || isValidLinkedPO(booking.cartonCloudSO);
 
   return (
-    <TooltipProvider delayDuration={300}>
+    <TooltipProvider delayDuration={400}>
       <Tooltip>
         <TooltipTrigger asChild>
           <div
@@ -285,20 +285,30 @@ export function DraggableBookingCard({
             )}
           </div>
         </TooltipTrigger>
-        {isShort && (
+        {(isShort || booking.notes) && (
           <TooltipContent side="right" className="max-w-xs z-[100]">
             <div className="space-y-1">
-              <p className="font-medium">{booking.title}</p>
-              <p className="text-xs">{booking.startTime} - {displayEndTime}</p>
-              {booking.carrier && <p className="text-xs">Carrier: {booking.carrier}</p>}
-              {booking.pallets !== undefined && booking.pallets > 0 && (
-                <p className="text-xs">{booking.pallets} pallet{booking.pallets !== 1 ? 's' : ''}</p>
+              {isShort && (
+                <>
+                  <p className="font-medium">{booking.title}</p>
+                  <p className="text-xs">{booking.startTime} - {displayEndTime}</p>
+                  {booking.carrier && <p className="text-xs">Carrier: {booking.carrier}</p>}
+                  {booking.pallets !== undefined && booking.pallets > 0 && (
+                    <p className="text-xs">{booking.pallets} pallet{booking.pallets !== 1 ? 's' : ''}</p>
+                  )}
+                  {booking.cartonCloudPO?.reference && (
+                    <p className="text-xs">PO: {booking.cartonCloudPO.reference}</p>
+                  )}
+                  {booking.cartonCloudSO?.reference && (
+                    <p className="text-xs">SO: {booking.cartonCloudSO.reference}</p>
+                  )}
+                </>
               )}
-              {booking.cartonCloudPO?.reference && (
-                <p className="text-xs">PO: {booking.cartonCloudPO.reference}</p>
-              )}
-              {booking.cartonCloudSO?.reference && (
-                <p className="text-xs">SO: {booking.cartonCloudSO.reference}</p>
+              {booking.notes && (
+                <>
+                  {isShort && <div className="border-t border-border my-1" />}
+                  <p className="text-xs text-muted-foreground whitespace-pre-wrap">{booking.notes}</p>
+                </>
               )}
             </div>
           </TooltipContent>
