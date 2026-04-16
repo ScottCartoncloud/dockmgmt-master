@@ -313,6 +313,7 @@ export type Database = {
           sort_order: number
           tenant_id: string
           updated_at: string
+          warehouse_id: string | null
         }
         Insert: {
           color?: string
@@ -323,6 +324,7 @@ export type Database = {
           sort_order?: number
           tenant_id: string
           updated_at?: string
+          warehouse_id?: string | null
         }
         Update: {
           color?: string
@@ -333,6 +335,7 @@ export type Database = {
           sort_order?: number
           tenant_id?: string
           updated_at?: string
+          warehouse_id?: string | null
         }
         Relationships: [
           {
@@ -340,6 +343,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dock_doors_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
             referencedColumns: ["id"]
           },
         ]
@@ -528,6 +538,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "user_tenants_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warehouses: {
+        Row: {
+          cartoncloud_warehouse_id: string
+          created_at: string | null
+          id: string
+          is_default: boolean
+          name: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          cartoncloud_warehouse_id: string
+          created_at?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          cartoncloud_warehouse_id?: string
+          created_at?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouses_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
