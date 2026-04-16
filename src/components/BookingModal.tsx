@@ -218,10 +218,15 @@ export function BookingModal({
     const palletsValue = pallets.trim() === '' ? undefined : parseInt(pallets, 10);
     const validPallets = palletsValue !== undefined && !isNaN(palletsValue) && palletsValue >= 0 ? palletsValue : undefined;
     
+    const defaultTitle = orderType === 'outbound' && selectedSO
+      ? `${selectedSO.customer} Shipment`
+      : selectedPO
+        ? `${selectedPO.customer} Delivery`
+        : 'New Booking';
+
     onSave({
       id: booking?.id,
-      title: title || (selectedPO ? `${selectedPO.customer} Delivery` : 'New Booking'),
-      // Parse as a *local* date to avoid timezone shifting (e.g. North America seeing prior day)
+      title: title || defaultTitle,
       date: parse(date, 'yyyy-MM-dd', new Date()),
       startTime,
       endTime,
@@ -231,8 +236,10 @@ export function BookingModal({
       pallets: validPallets,
       dockNumber,
       dockDoorId: selectedDockId || undefined,
-      purchaseOrderId: selectedPO?.id,
-      cartonCloudPO: selectedPO || undefined,
+      purchaseOrderId: orderType === 'inbound' ? selectedPO?.id : undefined,
+      cartonCloudPO: orderType === 'inbound' ? (selectedPO || undefined) : undefined,
+      salesOrderId: orderType === 'outbound' ? selectedSO?.id : undefined,
+      cartonCloudSO: orderType === 'outbound' ? (selectedSO || undefined) : undefined,
       notes: notes || undefined,
       status,
       customFields: Object.keys(customFieldValues).length > 0 ? customFieldValues : undefined,
