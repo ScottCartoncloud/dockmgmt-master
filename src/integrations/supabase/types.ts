@@ -687,6 +687,10 @@ export type Database = {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
       }
+      set_default_warehouse: {
+        Args: { _tenant_id: string; _warehouse_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "operator" | "viewer" | "super_user"
