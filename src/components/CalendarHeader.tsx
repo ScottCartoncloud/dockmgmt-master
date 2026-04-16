@@ -123,8 +123,8 @@ export function CalendarHeader({
       </div>
 
       <div className="flex items-center gap-3">
-        {warehouses && warehouses.length > 1 && onWarehouseChange && selectedWarehouseId && (
-          <Select value={selectedWarehouseId} onValueChange={onWarehouseChange}>
+        {warehouses && warehouses.length > 0 && onWarehouseChange && (
+          <Select value={selectedWarehouseId || ''} onValueChange={onWarehouseChange}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Select warehouse" />
             </SelectTrigger>
