@@ -364,6 +364,48 @@ serve(async (req) => {
 
       console.log('Credentials saved (encrypted) for tenant:', effectiveTenantId, 'with API base:', apiUrlValidation.normalized);
 
+      // Best-effort: fetch tenant slug/name from CartonCloud and persist them
+      try {
+        const credentials = btoa(`${client_id}:${client_secret}`);
+        const tokenResp = await fetch(`${apiUrlValidation.normalized}/uaa/oauth/token`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${credentials}`,
+            'Accept-Version': '1',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: 'grant_type=client_credentials',
+        });
+        if (tokenResp.ok) {
+          const tokenData = await tokenResp.json();
+          const userInfoResp = await fetch(`${apiUrlValidation.normalized}/uaa/userinfo`, {
+            headers: {
+              'Authorization': `Bearer ${tokenData.access_token}`,
+              'Accept-Version': '1',
+            },
+          });
+          if (userInfoResp.ok) {
+            const userInfo = await userInfoResp.json();
+            const tenants = Array.isArray(userInfo?.tenants) ? userInfo.tenants : [];
+            const match = tenants.find((t: any) => t?.id === cartoncloud_tenant_id) || (tenants.length === 1 ? tenants[0] : null);
+            if (match) {
+              await supabaseServiceClient
+                .from('cartoncloud_settings')
+                .update({
+                  cartoncloud_tenant_slug: match.slug ?? null,
+                  cartoncloud_tenant_name: match.name ?? null,
+                })
+                .eq('id', (result as any).id);
+              (result as any).cartoncloud_tenant_slug = match.slug ?? null;
+              (result as any).cartoncloud_tenant_name = match.name ?? null;
+              console.log('Persisted tenant slug:', match.slug);
+            }
+          }
+        }
+      } catch (slugErr) {
+        console.warn('Failed to auto-populate tenant slug:', slugErr instanceof Error ? slugErr.message : 'Unknown');
+      }
+
       return new Response(
         JSON.stringify({ success: true, data: result }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
