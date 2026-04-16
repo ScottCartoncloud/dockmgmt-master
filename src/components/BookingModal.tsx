@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { CrossDockBooking, CartonCloudPO, CustomFieldValues } from '@/types/booking';
+import { CrossDockBooking, CartonCloudPO, CartonCloudSO, CustomFieldValues } from '@/types/booking';
 import { format, parse } from 'date-fns';
-import { X, Search, Package, ExternalLink, Trash2, Loader2, Check, ChevronsUpDown, Truck } from 'lucide-react';
+import { X, Search, Package, ExternalLink, Trash2, Loader2, Check, ChevronsUpDown, Truck, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,7 +34,8 @@ import {
 } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { useSearchCartonCloudOrders, useCartonCloudSettings } from '@/hooks/useCartonCloudSettings';
+import { useSearchCartonCloudOrders, useSearchCartonCloudSOs, useCartonCloudSettings } from '@/hooks/useCartonCloudSettings';
+import { CartonCloudSOResult } from '@/hooks/useCartonCloudSettings';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 import { useDockDoors } from '@/hooks/useDockDoors';
 import { useActiveCustomBookingFields } from '@/hooks/useCustomBookingFields';
