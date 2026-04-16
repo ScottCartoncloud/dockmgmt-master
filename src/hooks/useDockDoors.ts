@@ -10,6 +10,7 @@ export interface DockDoor {
   is_active: boolean;
   sort_order: number;
   tenant_id: string | null;
+  warehouse_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -47,7 +48,7 @@ export function useCreateDockDoor() {
   const { activeTenant } = useTenantContext();
   
   return useMutation({
-    mutationFn: async (dock: Omit<DockDoorInsert, 'sort_order' | 'tenant_id'>) => {
+    mutationFn: async (dock: Omit<DockDoorInsert, 'sort_order' | 'tenant_id'> & { warehouse_id: string }) => {
       if (!activeTenant) {
         throw new Error('No active tenant selected');
       }

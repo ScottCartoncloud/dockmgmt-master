@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { CalendarView, CrossDockBooking } from '@/types/booking';
 import { Header } from '@/components/Header';
 import { CalendarHeader } from '@/components/CalendarHeader';
@@ -9,6 +9,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { useDockDoors } from '@/hooks/useDockDoors';
+import { useWarehouses } from '@/hooks/useWarehouses';
 import { useAuth } from '@/hooks/useAuth';
 import { useBookings, useCreateBooking, useUpdateBooking, useDeleteBooking } from '@/hooks/useBookings';
 
@@ -17,6 +18,7 @@ const STORAGE_KEY_VIEW = 'crossdock-calendar-view';
 const Index = () => {
   const { user } = useAuth();
   const { data: dockDoors } = useDockDoors();
+  const { warehouses, defaultWarehouse } = useWarehouses();
   const { bookings, isLoading } = useBookings();
   const createBooking = useCreateBooking();
   const updateBooking = useUpdateBooking();
@@ -30,6 +32,31 @@ const Index = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<CrossDockBooking | null>(null);
   const [defaultSlot, setDefaultSlot] = useState<{ date: Date; hour: number; dockNumber?: number; dockId?: string } | null>(null);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
+
+  // Default to the default warehouse
+  useEffect(() => {
+    if (defaultWarehouse && !selectedWarehouseId) {
+      setSelectedWarehouseId(defaultWarehouse.id);
+    }
+  }, [defaultWarehouse, selectedWarehouseId]);
+
+  // Reset warehouse selection on tenant change
+  useEffect(() => {
+    setSelectedWarehouseId('');
+  }, [defaultWarehouse?.tenant_id]);
+
+  // Filter docks and bookings by selected warehouse
+  const filteredDocks = useMemo(() => {
+    if (!dockDoors || !selectedWarehouseId) return dockDoors;
+    return dockDoors.filter(d => d.warehouse_id === selectedWarehouseId);
+  }, [dockDoors, selectedWarehouseId]);
+
+  const filteredBookings = useMemo(() => {
+    if (!selectedWarehouseId || !filteredDocks) return bookings;
+    const dockIds = new Set(filteredDocks.map(d => d.id));
+    return bookings.filter(b => !b.dockDoorId || dockIds.has(b.dockDoorId));
+  }, [bookings, filteredDocks, selectedWarehouseId]);
 
   // Persist view preference
   useEffect(() => {
@@ -203,6 +230,9 @@ const Index = () => {
           onDateChange={setCurrentDate}
           onViewChange={setView}
           onAddBooking={handleAddBooking}
+          warehouses={warehouses}
+          selectedWarehouseId={selectedWarehouseId}
+          onWarehouseChange={setSelectedWarehouseId}
         />
         
         <div className="flex-1 flex min-h-0 pl-4">
@@ -210,7 +240,7 @@ const Index = () => {
             {view === 'day' ? (
               <DayView
                 date={currentDate}
-                bookings={bookings}
+                bookings={filteredBookings}
                 onTimeSlotClick={handleTimeSlotClick}
                 onBookingClick={handleBookingClick}
                 onBookingMove={handleBookingMove}
@@ -219,7 +249,7 @@ const Index = () => {
             ) : (
               <WeekView
                 date={currentDate}
-                bookings={bookings}
+                bookings={filteredBookings}
                 onTimeSlotClick={handleTimeSlotClick}
                 onBookingClick={handleBookingClick}
                 onBookingMove={handleBookingMove}

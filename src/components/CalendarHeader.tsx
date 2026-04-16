@@ -8,7 +8,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { Warehouse } from '@/hooks/useWarehouses';
 
 interface CalendarHeaderProps {
   currentDate: Date;
@@ -16,6 +20,9 @@ interface CalendarHeaderProps {
   onDateChange: (date: Date) => void;
   onViewChange: (view: CalendarView) => void;
   onAddBooking: () => void;
+  warehouses?: Warehouse[];
+  selectedWarehouseId?: string;
+  onWarehouseChange?: (id: string) => void;
 }
 
 export function CalendarHeader({
@@ -24,6 +31,9 @@ export function CalendarHeader({
   onDateChange,
   onViewChange,
   onAddBooking,
+  warehouses,
+  selectedWarehouseId,
+  onWarehouseChange,
 }: CalendarHeaderProps) {
   const handlePrevious = () => {
     if (view === 'day') {
@@ -113,6 +123,18 @@ export function CalendarHeader({
       </div>
 
       <div className="flex items-center gap-3">
+        {warehouses && warehouses.length > 1 && onWarehouseChange && selectedWarehouseId && (
+          <Select value={selectedWarehouseId} onValueChange={onWarehouseChange}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Select warehouse" />
+            </SelectTrigger>
+            <SelectContent>
+              {warehouses.map((w) => (
+                <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <div className="flex items-center bg-muted rounded-lg p-1">
           <Button
             variant={view === 'day' ? 'default' : 'ghost'}
