@@ -291,9 +291,6 @@ export function BookingModal({
                   className="gap-1.5"
                   onClick={() => {
                     setOrderType('inbound');
-                    setSelectedSO(null);
-                    setSoSearchTerm('');
-                    setSoSearchResults([]);
                   }}
                 >
                   <ArrowDownToLine className="w-3.5 h-3.5" />
@@ -306,9 +303,6 @@ export function BookingModal({
                   className="gap-1.5"
                   onClick={() => {
                     setOrderType('outbound');
-                    setSelectedPO(null);
-                    setSearchTerm('');
-                    setSearchResults([]);
                   }}
                 >
                   <ArrowUpFromLine className="w-3.5 h-3.5" />
