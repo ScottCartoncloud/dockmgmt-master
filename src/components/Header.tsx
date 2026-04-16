@@ -9,7 +9,8 @@ import {
   Clock,
   LogOut,
   Truck,
-  Building2
+  Building2,
+  Warehouse
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
