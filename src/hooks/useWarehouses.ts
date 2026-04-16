@@ -124,17 +124,10 @@ export function useSetDefaultWarehouse() {
   return useMutation({
     mutationFn: async (warehouseId: string) => {
       if (!activeTenant) throw new Error('No active tenant');
-      // Unset current default
-      await supabase
-        .from('warehouses')
-        .update({ is_default: false })
-        .eq('tenant_id', activeTenant.id)
-        .eq('is_default', true);
-      // Set new default
-      const { error } = await supabase
-        .from('warehouses')
-        .update({ is_default: true })
-        .eq('id', warehouseId);
+      const { error } = await supabase.rpc('set_default_warehouse', {
+        _warehouse_id: warehouseId,
+        _tenant_id: activeTenant.id,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
