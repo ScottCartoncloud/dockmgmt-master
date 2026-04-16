@@ -202,27 +202,33 @@ export function DayView({
   }, [hideAllPreviews]);
 
   // Group bookings by dock - primary match is dock_door_id, fallback to dock number
-  const getBookingsForDock = useCallback((dock: DockDoor) => {
+  const getBookingsForDock = useCallback((dockId: string) => {
     return dayBookings.filter(booking => {
       // Primary: match by dock door ID
       if (booking.dockDoorId) {
-        return booking.dockDoorId === dock.id;
+        return booking.dockDoorId === dockId;
       }
       // Fallback: match by dock number (for older bookings)
       if (booking.dockNumber) {
-        const dockNum = parseInt(dock.name.replace(/\D/g, ''), 10);
-        return booking.dockNumber === dockNum || dock.name.includes(booking.dockNumber.toString());
+        const dock = activeDocks.find(d => d.id === dockId);
+        if (dock) {
+          const dockNum = parseInt(dock.name.replace(/\D/g, ''), 10);
+          return booking.dockNumber === dockNum || dock.name.includes(booking.dockNumber.toString());
+        }
       }
       return false;
     });
-  }, [dayBookings]);
+  }, [dayBookings, activeDocks]);
 
-  // Calculate layout for each dock's bookings
+  // Bookings without an assigned dock
+  const unassignedBookings = useMemo(() => dayBookings.filter(booking => !booking.dockDoorId && !booking.dockNumber), [dayBookings]);
+
+  // Calculate layout for each dock's bookings (plus unassigned)
   const dockLayouts = useMemo(() => {
     const layouts = new Map<string, Map<string, { column: number; totalColumns: number }>>();
     
     activeDocks.forEach(dock => {
-      const dockBookings = getBookingsForDock(dock);
+      const dockBookings = getBookingsForDock(dock.id);
       const positions = calculateBookingLayout(dockBookings);
       
       const bookingMap = new Map<string, { column: number; totalColumns: number }>();
@@ -232,12 +238,19 @@ export function DayView({
       
       layouts.set(dock.id, bookingMap);
     });
+
+    // Layout for unassigned bookings
+    if (unassignedBookings.length > 0) {
+      const positions = calculateBookingLayout(unassignedBookings);
+      const bookingMap = new Map<string, { column: number; totalColumns: number }>();
+      positions.forEach(pos => {
+        bookingMap.set(pos.booking.id, { column: pos.column, totalColumns: pos.totalColumns });
+      });
+      layouts.set('__unassigned__', bookingMap);
+    }
     
     return layouts;
-  }, [dayBookings, activeDocks, getBookingsForDock]);
-
-  // Bookings without an assigned dock
-  const unassignedBookings = useMemo(() => dayBookings.filter(booking => !booking.dockNumber), [dayBookings]);
+  }, [dayBookings, activeDocks, getBookingsForDock, unassignedBookings]);
 
   if (isLoadingDocks) {
     return (
