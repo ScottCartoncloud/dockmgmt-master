@@ -202,27 +202,33 @@ export function DayView({
   }, [hideAllPreviews]);
 
   // Group bookings by dock - primary match is dock_door_id, fallback to dock number
-  const getBookingsForDock = useCallback((dock: DockDoor) => {
+  const getBookingsForDock = useCallback((dockId: string) => {
     return dayBookings.filter(booking => {
       // Primary: match by dock door ID
       if (booking.dockDoorId) {
-        return booking.dockDoorId === dock.id;
+        return booking.dockDoorId === dockId;
       }
       // Fallback: match by dock number (for older bookings)
       if (booking.dockNumber) {
-        const dockNum = parseInt(dock.name.replace(/\D/g, ''), 10);
-        return booking.dockNumber === dockNum || dock.name.includes(booking.dockNumber.toString());
+        const dock = activeDocks.find(d => d.id === dockId);
+        if (dock) {
+          const dockNum = parseInt(dock.name.replace(/\D/g, ''), 10);
+          return booking.dockNumber === dockNum || dock.name.includes(booking.dockNumber.toString());
+        }
       }
       return false;
     });
-  }, [dayBookings]);
+  }, [dayBookings, activeDocks]);
 
-  // Calculate layout for each dock's bookings
+  // Bookings without an assigned dock
+  const unassignedBookings = useMemo(() => dayBookings.filter(booking => !booking.dockDoorId && !booking.dockNumber), [dayBookings]);
+
+  // Calculate layout for each dock's bookings (plus unassigned)
   const dockLayouts = useMemo(() => {
     const layouts = new Map<string, Map<string, { column: number; totalColumns: number }>>();
     
     activeDocks.forEach(dock => {
-      const dockBookings = getBookingsForDock(dock);
+      const dockBookings = getBookingsForDock(dock.id);
       const positions = calculateBookingLayout(dockBookings);
       
       const bookingMap = new Map<string, { column: number; totalColumns: number }>();
@@ -232,12 +238,19 @@ export function DayView({
       
       layouts.set(dock.id, bookingMap);
     });
+
+    // Layout for unassigned bookings
+    if (unassignedBookings.length > 0) {
+      const positions = calculateBookingLayout(unassignedBookings);
+      const bookingMap = new Map<string, { column: number; totalColumns: number }>();
+      positions.forEach(pos => {
+        bookingMap.set(pos.booking.id, { column: pos.column, totalColumns: pos.totalColumns });
+      });
+      layouts.set('__unassigned__', bookingMap);
+    }
     
     return layouts;
-  }, [dayBookings, activeDocks, getBookingsForDock]);
-
-  // Bookings without an assigned dock
-  const unassignedBookings = useMemo(() => dayBookings.filter(booking => !booking.dockNumber), [dayBookings]);
+  }, [dayBookings, activeDocks, getBookingsForDock, unassignedBookings]);
 
   if (isLoadingDocks) {
     return (
@@ -260,7 +273,7 @@ export function DayView({
 
   return (
     <div className="flex-1 overflow-auto">
-      <div style={{ minWidth: Math.max(500, activeDocks.length * MIN_DOCK_WIDTH + 60) }}>
+      <div style={{ minWidth: Math.max(500, (activeDocks.length + (unassignedBookings.length > 0 ? 1 : 0)) * MIN_DOCK_WIDTH + 60) }}>
         {/* Header with dock columns */}
         <div className="sticky top-0 z-20 bg-card border-b border-border">
           <div className="flex">
@@ -281,7 +294,7 @@ export function DayView({
             {activeDocks.map((dock) => (
               <div
                 key={dock.id}
-                className="flex-1 p-3 border-r border-border last:border-r-0 text-center"
+                className="flex-1 p-3 border-r border-border text-center"
                 style={{ minWidth: MIN_DOCK_WIDTH }}
               >
                 <div className="flex items-center justify-center gap-2">
@@ -293,6 +306,19 @@ export function DayView({
                 </div>
               </div>
             ))}
+            
+            {/* Unassigned column header */}
+            {unassignedBookings.length > 0 && (
+              <div
+                className="flex-1 p-3 text-center"
+                style={{ minWidth: MIN_DOCK_WIDTH }}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-muted-foreground/40" />
+                  <span className="font-medium text-muted-foreground">Unassigned</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -331,7 +357,7 @@ export function DayView({
             onDrop={handleDrop}
           >
             {activeDocks.map((dock, dockIndex) => {
-              const dockBookings = getBookingsForDock(dock);
+              const dockBookings = getBookingsForDock(dock.id);
               
               return (
                 <div
@@ -412,27 +438,72 @@ export function DayView({
                 </div>
               );
             })}
+
+            {/* Unassigned bookings column */}
+            {unassignedBookings.length > 0 && (
+              <div
+                className="flex-1 relative border-l border-border"
+                style={{ minWidth: MIN_DOCK_WIDTH }}
+              >
+                {/* Hour grid lines */}
+                {HOURS.map(({ hour }) => {
+                  const isWorking = isHourInWorkingRange(hour) && isWorkingDay;
+                  return (
+                    <div
+                      key={hour}
+                      className={cn(
+                        'border-b border-border transition-colors relative',
+                        isCurrentHour(hour) && 'bg-accent/5',
+                        !isWorking && 'bg-muted/40 cursor-not-allowed',
+                        isWorking && 'cursor-pointer hover:bg-muted/50'
+                      )}
+                      style={{ height: HOUR_HEIGHT }}
+                      onClick={() => isWorking && onTimeSlotClick(date, hour)}
+                    >
+                      <div className="absolute left-0 right-0 top-[25%] border-t border-dashed border-border/40" />
+                      <div className="absolute left-0 right-0 top-[50%] border-t border-dotted border-border/60" />
+                      <div className="absolute left-0 right-0 top-[75%] border-t border-dashed border-border/40" />
+                    </div>
+                  );
+                })}
+
+                {/* Unassigned bookings */}
+                <div className="absolute inset-0 pointer-events-none">
+                  {unassignedBookings.map((booking) => {
+                    const style = getBookingPositionStyle(booking, START_HOUR);
+                    const layout = dockLayouts.get('__unassigned__')?.get(booking.id);
+                    const layoutStyle = layout
+                      ? getBookingLayoutStyle(layout.column, layout.totalColumns, 4)
+                      : { left: '4px', right: '4px' };
+
+                    return (
+                      <div
+                        key={booking.id}
+                        className="absolute pointer-events-auto z-10"
+                        style={{
+                          top: style.top,
+                          height: style.height,
+                          left: layoutStyle.left,
+                          right: layoutStyle.right,
+                        }}
+                      >
+                        <DraggableBookingCard
+                          booking={booking}
+                          onClick={onBookingClick}
+                          onDragStart={handleDragStart}
+                          onDragEnd={handleDragEnd}
+                          onResize={onBookingResize}
+                          dockColor="#9CA3AF"
+                          showDockBadge={false}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Unassigned bookings indicator */}
-        {unassignedBookings.length > 0 && (
-          <div className="sticky bottom-0 bg-warning/10 border-t border-warning/30 p-3">
-            <div className="text-sm text-warning-foreground">
-              <span className="font-medium">{unassignedBookings.length} booking(s)</span> without assigned dock:
-              {unassignedBookings.slice(0, 3).map(b => (
-                <button
-                  key={b.id}
-                  onClick={() => onBookingClick(b)}
-                  className="ml-2 underline hover:no-underline"
-                >
-                  {b.title}
-                </button>
-              ))}
-              {unassignedBookings.length > 3 && <span className="ml-1">and {unassignedBookings.length - 3} more...</span>}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
