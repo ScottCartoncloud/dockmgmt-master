@@ -230,6 +230,9 @@ const Index = () => {
           onDateChange={setCurrentDate}
           onViewChange={setView}
           onAddBooking={handleAddBooking}
+          warehouses={warehouses}
+          selectedWarehouseId={selectedWarehouseId}
+          onWarehouseChange={setSelectedWarehouseId}
         />
         
         <div className="flex-1 flex min-h-0 pl-4">
@@ -237,7 +240,7 @@ const Index = () => {
             {view === 'day' ? (
               <DayView
                 date={currentDate}
-                bookings={bookings}
+                bookings={filteredBookings}
                 onTimeSlotClick={handleTimeSlotClick}
                 onBookingClick={handleBookingClick}
                 onBookingMove={handleBookingMove}
@@ -246,7 +249,7 @@ const Index = () => {
             ) : (
               <WeekView
                 date={currentDate}
-                bookings={bookings}
+                bookings={filteredBookings}
                 onTimeSlotClick={handleTimeSlotClick}
                 onBookingClick={handleBookingClick}
                 onBookingMove={handleBookingMove}
