@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { DockDoor, useDockDoors, useCreateDockDoor, useUpdateDockDoor, useDeleteDockDoor } from '@/hooks/useDockDoors';
+import { useWarehouses } from '@/hooks/useWarehouses';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -38,6 +42,7 @@ const PRESET_COLORS = [
 interface DockFormData {
   name: string;
   color: string;
+  warehouse_id: string;
 }
 
 export function DockConfiguration() {
@@ -45,40 +50,43 @@ export function DockConfiguration() {
   const createDock = useCreateDockDoor();
   const updateDock = useUpdateDockDoor();
   const deleteDock = useDeleteDockDoor();
+  const { warehouses, defaultWarehouse } = useWarehouses();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDock, setEditingDock] = useState<DockDoor | null>(null);
   const [deleteConfirmDock, setDeleteConfirmDock] = useState<DockDoor | null>(null);
-  const [formData, setFormData] = useState<DockFormData>({ name: '', color: '#3B82F6' });
+  const [formData, setFormData] = useState<DockFormData>({ name: '', color: '#3B82F6', warehouse_id: '' });
 
   const openCreateDialog = () => {
     setEditingDock(null);
-    setFormData({ name: '', color: '#3B82F6' });
+    setFormData({ name: '', color: '#3B82F6', warehouse_id: defaultWarehouse?.id ?? '' });
     setIsDialogOpen(true);
   };
 
   const openEditDialog = (dock: DockDoor) => {
     setEditingDock(dock);
-    setFormData({ name: dock.name, color: dock.color });
+    setFormData({ name: dock.name, color: dock.color, warehouse_id: dock.warehouse_id ?? '' });
     setIsDialogOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name.trim()) return;
+    if (!formData.name.trim() || !formData.warehouse_id) return;
 
     if (editingDock) {
       await updateDock.mutateAsync({ 
         id: editingDock.id, 
         name: formData.name.trim(), 
-        color: formData.color 
+        color: formData.color,
+        warehouse_id: formData.warehouse_id,
       });
     } else {
       await createDock.mutateAsync({ 
         name: formData.name.trim(), 
         color: formData.color,
-        is_active: true
+        is_active: true,
+        warehouse_id: formData.warehouse_id,
       });
     }
     
