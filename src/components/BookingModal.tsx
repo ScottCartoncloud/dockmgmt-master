@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { useSearchCartonCloudOrders, useSearchCartonCloudSOs, useCartonCloudSettings } from '@/hooks/useCartonCloudSettings';
+import { useSearchCartonCloudOrders, useSearchCartonCloudSOs, useCartonCloudSettings, buildCartonCloudAppUrl } from '@/hooks/useCartonCloudSettings';
 import { CartonCloudSOResult } from '@/hooks/useCartonCloudSettings';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 import { useDockDoors } from '@/hooks/useDockDoors';
@@ -421,15 +421,33 @@ export function BookingModal({
                         {selectedPO.arrivalDate && ` • Arrival: ${selectedPO.arrivalDate}`}
                       </div>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedPO(null)}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {(() => {
+                        const url = buildCartonCloudAppUrl(cartonCloudSettings, 'PurchaseOrders', selectedPO.numericId);
+                        return url ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            title="View in CartonCloud"
+                          >
+                            <a href={url} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          </Button>
+                        ) : null;
+                      })()}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedPO(null)}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 )}
               </>
@@ -533,15 +551,33 @@ export function BookingModal({
                         {selectedSO.deliveryDate && ` • Delivery: ${selectedSO.deliveryDate}`}
                       </div>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedSO(null)}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {(() => {
+                        const url = buildCartonCloudAppUrl(cartonCloudSettings, 'SaleOrders', selectedSO.numericId);
+                        return url ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            title="View in CartonCloud"
+                          >
+                            <a href={url} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          </Button>
+                        ) : null;
+                      })()}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedSO(null)}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 )}
               </>

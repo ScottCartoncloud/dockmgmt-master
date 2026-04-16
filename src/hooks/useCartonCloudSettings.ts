@@ -30,13 +30,39 @@ export const DEFAULT_API_BASE_URL = 'https://api.cartoncloud.com';
 export interface CartonCloudSettings {
   id: string;
   cartoncloud_tenant_id: string;
+  cartoncloud_tenant_slug: string | null;
+  cartoncloud_tenant_name: string | null;
   tenant_id: string | null;
   is_active: boolean;
   api_base_url: string;
   created_at: string;
   updated_at: string;
-  // Indicates credentials exist (for UI state) without exposing actual values
   has_credentials: boolean;
+}
+
+/**
+ * Build a deep link into the CartonCloud web app for a Sale Order or Purchase Order.
+ * Returns null if we don't have enough info (slug or numericId missing).
+ *
+ * Examples:
+ *   https://app.cartoncloud.com/InterCentral/SaleOrders/view/787061
+ *   https://app.na.cartoncloud.com/Acme/PurchaseOrders/view/123
+ */
+export function buildCartonCloudAppUrl(
+  settings: Pick<CartonCloudSettings, 'cartoncloud_tenant_slug' | 'api_base_url'> | null | undefined,
+  type: 'PurchaseOrders' | 'SaleOrders',
+  numericId: string | null | undefined,
+): string | null {
+  if (!settings?.cartoncloud_tenant_slug || !numericId) return null;
+  let appHost = 'app.cartoncloud.com';
+  try {
+    const apiHost = new URL(settings.api_base_url || DEFAULT_API_BASE_URL).hostname;
+    if (apiHost === 'api.na.cartoncloud.com') appHost = 'app.na.cartoncloud.com';
+    else if (apiHost.startsWith('api.')) appHost = 'app.' + apiHost.slice(4);
+  } catch {
+    // fall back to default
+  }
+  return `https://${appHost}/${settings.cartoncloud_tenant_slug}/${type}/view/${numericId}`;
 }
 
 export function useCartonCloudSettings() {
@@ -45,11 +71,9 @@ export function useCartonCloudSettings() {
   return useQuery({
     queryKey: ['cartoncloud-settings', activeTenant?.id],
     queryFn: async () => {
-      // SECURITY: Use the safe view which excludes sensitive credential columns
-      // The base table is blocked from all client access
       let query = supabase
         .from('cartoncloud_settings_safe')
-        .select('id, cartoncloud_tenant_id, tenant_id, is_active, api_base_url, created_at, updated_at, has_credentials');
+        .select('id, cartoncloud_tenant_id, cartoncloud_tenant_slug, cartoncloud_tenant_name, tenant_id, is_active, api_base_url, created_at, updated_at, has_credentials');
 
       if (activeTenant?.id) {
         query = query.eq('tenant_id', activeTenant.id);
@@ -58,13 +82,11 @@ export function useCartonCloudSettings() {
       const { data, error } = await query.maybeSingle();
 
       if (error) throw error;
-
       if (!data) return null;
 
       return data as CartonCloudSettings;
     },
     enabled: !!activeTenant?.id,
-    // Prevent "tab switch back" from re-fetching and resetting the form UI.
     refetchOnWindowFocus: false,
   });
 }
