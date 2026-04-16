@@ -736,6 +736,7 @@ serve(async (req) => {
     }
 
     if (action === 'search-outbound-orders') {
+      console.log('Processing search-outbound-orders action');
       if (!searchTerm) {
         return new Response(
           JSON.stringify({ error: 'Search term is required' }),
