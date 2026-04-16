@@ -323,12 +323,26 @@ async function searchOutboundOrders(
   }
 }
 
+// Find tenant info (slug, name) for the configured cartoncloud_tenant_id from userinfo response
+function extractTenantInfo(userInfo: any, cartoncloudTenantId: string): { slug: string | null; name: string | null } {
+  const tenants = Array.isArray(userInfo?.tenants) ? userInfo.tenants : [];
+  const match = tenants.find((t: any) => t?.id === cartoncloudTenantId);
+  if (match) {
+    return { slug: match.slug ?? null, name: match.name ?? null };
+  }
+  // Fallback: if only one tenant, use it
+  if (tenants.length === 1) {
+    return { slug: tenants[0]?.slug ?? null, name: tenants[0]?.name ?? null };
+  }
+  return { slug: null, name: null };
+}
+
 async function testConnection(
   clientId: string,
   clientSecret: string,
   tenantId: string,
   apiBaseUrl: string = DEFAULT_CARTONCLOUD_API_BASE
-): Promise<{ success: boolean; message: string; userInfo?: any }> {
+): Promise<{ success: boolean; message: string; userInfo?: any; tenantSlug?: string | null; tenantName?: string | null }> {
   try {
     const accessToken = await getAccessToken(clientId, clientSecret, tenantId, apiBaseUrl);
     
@@ -349,12 +363,17 @@ async function testConnection(
       }
 
       const userInfo = await response.json();
-      console.log('Connection test successful, user:', userInfo.name);
+      const { slug, name } = extractTenantInfo(userInfo, tenantId);
+      console.log('Connection test successful, user:', userInfo.name, 'tenant slug:', slug);
       
       return {
         success: true,
-        message: `Connected successfully as ${userInfo.name}`,
+        message: name
+          ? `Connected to ${name}${slug ? ` (${slug})` : ''}`
+          : `Connected successfully as ${userInfo.name}`,
         userInfo,
+        tenantSlug: slug,
+        tenantName: name,
       };
     } finally {
       clearTimeout(timeoutId);
