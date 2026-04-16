@@ -638,10 +638,25 @@ serve(async (req) => {
 
       const result = await testConnection(decClientId, decClientSecret, savedSettings.cartoncloud_tenant_id, validatedApiBaseUrl);
       
+      // Persist slug/name back to settings if we got them
+      if (result.success && (result.tenantSlug || result.tenantName)) {
+        const { error: updateError } = await supabaseServiceClient
+          .from('cartoncloud_settings')
+          .update({
+            cartoncloud_tenant_slug: result.tenantSlug ?? null,
+            cartoncloud_tenant_name: result.tenantName ?? null,
+          })
+          .eq('id', savedSettings.id);
+        if (updateError) {
+          console.error('Failed to persist tenant slug/name:', updateError.message);
+        }
+      }
+
       logAudit('CARTONCLOUD_TEST_SAVED_CONNECTION_RESULT', user.id, userTenantId, { 
         success: result.success,
         settingsId: savedSettings.id,
         apiBaseUrl: validatedApiBaseUrl,
+        tenantSlug: result.tenantSlug ?? null,
       });
 
       return new Response(JSON.stringify(result), {
