@@ -168,6 +168,17 @@ export interface CartonCloudOrder {
   items?: CartonCloudOrderItem[];
 }
 
+export interface CartonCloudSOResult {
+  id: string;
+  reference: string;
+  customer: string;
+  status: string;
+  deliveryDate: string | null;
+  itemCount: number;
+  warehouseName: string;
+  numericId?: string | null;
+}
+
 export function useSearchCartonCloudOrders() {
   const { activeTenant } = useTenantContext();
 
@@ -179,6 +190,30 @@ export function useSearchCartonCloudOrders() {
 
       const { data, error } = await supabase.functions.invoke('cartoncloud', {
         body: { action: 'search-orders', searchTerm, appTenantId: activeTenant.id },
+      });
+
+      if (error) {
+        const detailed = await getEdgeFunctionErrorMessage(error);
+        throw new Error(detailed ?? error.message);
+      }
+      if (data?.error) throw new Error(data.error);
+
+      return data?.orders || [];
+    },
+  });
+}
+
+export function useSearchCartonCloudSOs() {
+  const { activeTenant } = useTenantContext();
+
+  return useMutation({
+    mutationFn: async (searchTerm: string): Promise<CartonCloudSOResult[]> => {
+      if (!activeTenant?.id) {
+        throw new Error('No active tenant selected');
+      }
+
+      const { data, error } = await supabase.functions.invoke('cartoncloud', {
+        body: { action: 'search-outbound-orders', searchTerm, appTenantId: activeTenant.id },
       });
 
       if (error) {

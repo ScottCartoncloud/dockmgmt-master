@@ -268,6 +268,60 @@ async function searchInboundOrders(
   }
 }
 
+async function searchOutboundOrders(
+  accessToken: string,
+  tenantId: string,
+  searchTerm: string,
+  apiBaseUrl: string = DEFAULT_CARTONCLOUD_API_BASE
+): Promise<any[]> {
+  console.log('Searching outbound orders for reference:', searchTerm, 'at:', apiBaseUrl);
+
+  const searchPayload = {
+    condition: {
+      type: 'OrCondition',
+      conditions: [
+        {
+          type: 'TextComparisonCondition',
+          field: { type: 'ValueField', value: 'reference' },
+          value: { type: 'ValueField', value: searchTerm },
+          method: 'STARTS_WITH',
+        },
+      ],
+    },
+  };
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetch(
+      `${apiBaseUrl}/tenants/${tenantId}/outbound-orders/search`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept-Version': '1',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(searchPayload),
+        signal: controller.signal,
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Outbound search failed:', response.status, errorText);
+      throw new Error(`Outbound search failed: ${response.status}`);
+    }
+
+    const results = await response.json();
+    console.log('Outbound search returned', results.length, 'results');
+    return results;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function testConnection(
   clientId: string,
   clientSecret: string,
@@ -674,6 +728,44 @@ serve(async (req) => {
         numericId: order.references?.numericId || null,
       }));
 
+
+      return new Response(JSON.stringify({ orders: formattedOrders }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (action === 'search-outbound-orders') {
+      if (!searchTerm) {
+        return new Response(
+          JSON.stringify({ error: 'Search term is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (typeof searchTerm !== 'string' || searchTerm.length > 200) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid search term' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const orders = await searchOutboundOrders(
+        accessToken,
+        settings.cartoncloud_tenant_id,
+        searchTerm,
+        validatedApiBaseUrl
+      );
+
+      const formattedOrders = orders.map((order: any) => ({
+        id: order.id,
+        reference: order.references?.customer || order.reference || 'N/A',
+        customer: order.customer?.name || 'Unknown Customer',
+        status: order.status || 'unknown',
+        deliveryDate: order.details?.deliver?.requiredDate || null,
+        itemCount: Array.isArray(order.items) ? order.items.length : 0,
+        warehouseName: order.warehouse?.name || 'Unknown Warehouse',
+        numericId: order.references?.numericId || null,
+      }));
 
       return new Response(JSON.stringify({ orders: formattedOrders }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { CrossDockBooking, CartonCloudPO, CustomFieldValues } from '@/types/booking';
+import { CrossDockBooking, CartonCloudPO, CartonCloudSO, CustomFieldValues } from '@/types/booking';
 import { format, parse } from 'date-fns';
-import { X, Search, Package, ExternalLink, Trash2, Loader2, Check, ChevronsUpDown, Truck } from 'lucide-react';
+import { X, Search, Package, ExternalLink, Trash2, Loader2, Check, ChevronsUpDown, Truck, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,7 +34,8 @@ import {
 } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { useSearchCartonCloudOrders, useCartonCloudSettings } from '@/hooks/useCartonCloudSettings';
+import { useSearchCartonCloudOrders, useSearchCartonCloudSOs, useCartonCloudSettings } from '@/hooks/useCartonCloudSettings';
+import { CartonCloudSOResult } from '@/hooks/useCartonCloudSettings';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 import { useDockDoors } from '@/hooks/useDockDoors';
 import { useActiveCustomBookingFields } from '@/hooks/useCustomBookingFields';
@@ -80,12 +81,18 @@ export function BookingModal({
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<CartonCloudPO[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<CustomFieldValues>({});
+  const [orderType, setOrderType] = useState<'inbound' | 'outbound'>('inbound');
+  const [selectedSO, setSelectedSO] = useState<CartonCloudSO | null>(null);
+  const [soSearchOpen, setSoSearchOpen] = useState(false);
+  const [soSearchTerm, setSoSearchTerm] = useState('');
+  const [soSearchResults, setSoSearchResults] = useState<CartonCloudSOResult[]>([]);
 
   const { data: cartonCloudSettings } = useCartonCloudSettings();
   const { data: dockDoors } = useDockDoors();
   const { data: customFields } = useActiveCustomBookingFields();
   const { carriers } = useCarriers();
   const { mutate: mutateSearchOrders, isPending: isSearchPending } = useSearchCartonCloudOrders();
+  const { mutate: mutateSearchSOs, isPending: isSOSearchPending } = useSearchCartonCloudSOs();
   const isCartonCloudConnected = !!cartonCloudSettings;
   const activeDocks = useMemo(() => (dockDoors || []).filter((d) => d.is_active), [dockDoors]);
   
@@ -113,11 +120,31 @@ export function BookingModal({
     }
   }, [isCartonCloudConnected, mutateSearchOrders]);
 
+  const performSoSearch = useCallback((term: string) => {
+    if (term.length >= 2 && isCartonCloudConnected) {
+      mutateSearchSOs(term, {
+        onSuccess: (results) => {
+          setSoSearchResults(results);
+        },
+        onError: () => {
+          setSoSearchResults([]);
+        },
+      });
+    } else {
+      setSoSearchResults([]);
+    }
+  }, [isCartonCloudConnected, mutateSearchSOs]);
+
   const debouncedSearch = useDebouncedCallback(performPoSearch, 300);
+  const debouncedSoSearch = useDebouncedCallback(performSoSearch, 300);
 
   useEffect(() => {
     debouncedSearch(searchTerm);
   }, [searchTerm, debouncedSearch]);
+
+  useEffect(() => {
+    debouncedSoSearch(soSearchTerm);
+  }, [soSearchTerm, debouncedSoSearch]);
 
   useEffect(() => {
     if (booking) {
@@ -129,14 +156,15 @@ export function BookingModal({
       setCarrierName(booking.carrier);
       setSelectedCarrierId(booking.carrierId || null);
       setTruckRego(booking.truckRego || '');
-      // Find dock ID from booking's dock_door_id
       setSelectedDockId(booking.dockDoorId || '');
       setNotes(booking.notes || '');
       setStatus(booking.status);
       setSelectedPO(booking.cartonCloudPO || null);
+      setSelectedSO(booking.cartonCloudSO || null);
+      // Detect order type from saved data
+      setOrderType(booking.cartonCloudSO ? 'outbound' : 'inbound');
       setCustomFieldValues(booking.customFields || {});
     } else {
-      // Reset form for new booking
       setTitle('');
       setPallets('');
       setDate(defaultDate ? format(defaultDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'));
@@ -145,7 +173,6 @@ export function BookingModal({
       setCarrierName('');
       setSelectedCarrierId(null);
       setTruckRego('');
-      // Find dock ID from defaultDockNumber
       const defaultDock = defaultDockNumber ? activeDocks.find(d => {
         const num = parseInt(d.name.replace(/\D/g, ''), 10);
         return num === defaultDockNumber;
@@ -154,10 +181,14 @@ export function BookingModal({
       setNotes('');
       setStatus('scheduled');
       setSelectedPO(null);
+      setSelectedSO(null);
+      setOrderType('inbound');
       setCustomFieldValues({});
     }
     setSearchTerm('');
     setSearchResults([]);
+    setSoSearchTerm('');
+    setSoSearchResults([]);
     setCarrierSearchTerm('');
   }, [booking, defaultDate, defaultHour, defaultDockNumber, open, activeDocks]);
 
@@ -187,10 +218,15 @@ export function BookingModal({
     const palletsValue = pallets.trim() === '' ? undefined : parseInt(pallets, 10);
     const validPallets = palletsValue !== undefined && !isNaN(palletsValue) && palletsValue >= 0 ? palletsValue : undefined;
     
+    const defaultTitle = orderType === 'outbound' && selectedSO
+      ? `${selectedSO.customer} Shipment`
+      : selectedPO
+        ? `${selectedPO.customer} Delivery`
+        : 'New Booking';
+
     onSave({
       id: booking?.id,
-      title: title || (selectedPO ? `${selectedPO.customer} Delivery` : 'New Booking'),
-      // Parse as a *local* date to avoid timezone shifting (e.g. North America seeing prior day)
+      title: title || defaultTitle,
       date: parse(date, 'yyyy-MM-dd', new Date()),
       startTime,
       endTime,
@@ -200,8 +236,10 @@ export function BookingModal({
       pallets: validPallets,
       dockNumber,
       dockDoorId: selectedDockId || undefined,
-      purchaseOrderId: selectedPO?.id,
-      cartonCloudPO: selectedPO || undefined,
+      purchaseOrderId: orderType === 'inbound' ? selectedPO?.id : undefined,
+      cartonCloudPO: orderType === 'inbound' ? (selectedPO || undefined) : undefined,
+      salesOrderId: orderType === 'outbound' ? selectedSO?.id : undefined,
+      cartonCloudSO: orderType === 'outbound' ? (selectedSO || undefined) : undefined,
       notes: notes || undefined,
       status,
       customFields: Object.keys(customFieldValues).length > 0 ? customFieldValues : undefined,
@@ -242,15 +280,50 @@ export function BookingModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6 mt-4">
-          {/* PO Search */}
+          {/* Order Type Toggle + Search */}
           <div className="space-y-2">
-            <Label>Link to CartonCloud PO</Label>
+            {isCartonCloudConnected && (
+              <div className="flex items-center gap-1 mb-2">
+                <Button
+                  type="button"
+                  variant={orderType === 'inbound' ? 'default' : 'outline'}
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => {
+                    setOrderType('inbound');
+                    setSelectedSO(null);
+                    setSoSearchTerm('');
+                    setSoSearchResults([]);
+                  }}
+                >
+                  <ArrowDownToLine className="w-3.5 h-3.5" />
+                  Inbound (PO)
+                </Button>
+                <Button
+                  type="button"
+                  variant={orderType === 'outbound' ? 'default' : 'outline'}
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => {
+                    setOrderType('outbound');
+                    setSelectedPO(null);
+                    setSearchTerm('');
+                    setSearchResults([]);
+                  }}
+                >
+                  <ArrowUpFromLine className="w-3.5 h-3.5" />
+                  Outbound (SO)
+                </Button>
+              </div>
+            )}
+
             {!isCartonCloudConnected ? (
               <div className="p-3 bg-muted/50 border border-border rounded-md text-sm text-muted-foreground">
-                CartonCloud is not connected. Configure it in Settings → Integration to search for Purchase Orders.
+                CartonCloud is not connected. Configure it in Settings → Integration to search for orders.
               </div>
-            ) : (
+            ) : orderType === 'inbound' ? (
               <>
+                <Label>Link to CartonCloud PO</Label>
                 <Popover open={poSearchOpen} onOpenChange={setPoSearchOpen}>
                   <PopoverTrigger asChild>
                     <Button
@@ -359,6 +432,118 @@ export function BookingModal({
                       variant="ghost"
                       size="sm"
                       onClick={() => setSelectedPO(null)}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <Label>Link to CartonCloud SO</Label>
+                <Popover open={soSearchOpen} onOpenChange={setSoSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                    >
+                      {selectedSO ? (
+                        <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4 text-accent" />
+                          <span>SO: {selectedSO.reference}</span>
+                          <span className="text-muted-foreground">- {selectedSO.customer}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Search className="w-4 h-4" />
+                          <span>Search Sales Orders...</span>
+                        </div>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput 
+                        placeholder="Type SO reference number..." 
+                        value={soSearchTerm}
+                        onValueChange={setSoSearchTerm}
+                      />
+                      <CommandList>
+                        {isSOSearchPending && (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                            <span className="ml-2 text-sm text-muted-foreground">Searching...</span>
+                          </div>
+                        )}
+                        {!isSOSearchPending && soSearchTerm.length < 2 && (
+                          <div className="py-4 text-center text-sm text-muted-foreground">
+                            Type at least 2 characters to search
+                          </div>
+                        )}
+                        {!isSOSearchPending && soSearchTerm.length >= 2 && soSearchResults.length === 0 && (
+                          <CommandEmpty>No sales orders found.</CommandEmpty>
+                        )}
+                        {soSearchResults.length > 0 && (
+                          <CommandGroup>
+                            {soSearchResults.map((so) => (
+                              <CommandItem
+                                key={so.id}
+                                onSelect={() => {
+                                  setSelectedSO(so as CartonCloudSO);
+                                  setSoSearchOpen(false);
+                                  if (!title) {
+                                    setTitle(`${so.customer} Shipment`);
+                                  }
+                                }}
+                                className="cursor-pointer"
+                              >
+                                <div className="flex flex-col gap-1 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-medium">SO: {so.reference}</span>
+                                    <Badge variant={getStatusBadgeVariant(so.status)} className="text-xs">
+                                      {so.status}
+                                    </Badge>
+                                  </div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {so.customer} • {so.warehouseName}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {so.itemCount} line{so.itemCount !== 1 ? 's' : ''}
+                                    {so.deliveryDate && ` • Delivery: ${so.deliveryDate}`}
+                                  </div>
+                                </div>
+                                <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {selectedSO && (
+                  <div className="flex items-center justify-between p-3 bg-accent/5 border border-accent/20 rounded-md">
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">SO: {selectedSO.reference}</span>
+                        <Badge variant={getStatusBadgeVariant(selectedSO.status)} className="text-xs">
+                          {selectedSO.status}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {selectedSO.customer} • {selectedSO.warehouseName}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {selectedSO.itemCount} line{selectedSO.itemCount !== 1 ? 's' : ''}
+                        {selectedSO.deliveryDate && ` • Delivery: ${selectedSO.deliveryDate}`}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedSO(null)}
                       className="text-muted-foreground hover:text-destructive"
                     >
                       <X className="w-4 h-4" />

@@ -1,0 +1,1 @@
+ALTER TABLE public.bookings ADD COLUMN sales_order_id text, ADD COLUMN cartoncloud_so jsonb;

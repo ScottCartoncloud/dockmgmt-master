@@ -69,6 +69,7 @@ export type Database = {
           carrier: string | null
           carrier_id: string | null
           cartoncloud_po: Json | null
+          cartoncloud_so: Json | null
           confirmation_email: string | null
           created_at: string
           created_by: string | null
@@ -81,6 +82,7 @@ export type Database = {
           pallets: number | null
           purchase_order: Json | null
           purchase_order_id: string | null
+          sales_order_id: string | null
           start_time: string
           status: string
           tenant_id: string
@@ -92,6 +94,7 @@ export type Database = {
           carrier?: string | null
           carrier_id?: string | null
           cartoncloud_po?: Json | null
+          cartoncloud_so?: Json | null
           confirmation_email?: string | null
           created_at?: string
           created_by?: string | null
@@ -104,6 +107,7 @@ export type Database = {
           pallets?: number | null
           purchase_order?: Json | null
           purchase_order_id?: string | null
+          sales_order_id?: string | null
           start_time: string
           status?: string
           tenant_id: string
@@ -115,6 +119,7 @@ export type Database = {
           carrier?: string | null
           carrier_id?: string | null
           cartoncloud_po?: Json | null
+          cartoncloud_so?: Json | null
           confirmation_email?: string | null
           created_at?: string
           created_by?: string | null
@@ -127,6 +132,7 @@ export type Database = {
           pallets?: number | null
           purchase_order?: Json | null
           purchase_order_id?: string | null
+          sales_order_id?: string | null
           start_time?: string
           status?: string
           tenant_id?: string
