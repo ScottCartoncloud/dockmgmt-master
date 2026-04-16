@@ -49,10 +49,24 @@ export default function Auth() {
   const [signupPassword, setSignupPassword] = useState('');
   const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
 
-  // Get invite token from URL or localStorage (for OAuth redirect recovery)
+  // Get invite token from URL hash fragment or localStorage (for OAuth redirect recovery)
+  // Hash fragments are not sent to servers, preventing token leakage in logs/referrers
   const getInviteToken = (): string | null => {
+    // Check hash fragment first (e.g., /auth#invite=<uuid>)
+    const hash = window.location.hash;
+    if (hash) {
+      const hashParams = new URLSearchParams(hash.slice(1));
+      const hashToken = hashParams.get('invite');
+      if (hashToken) return hashToken;
+    }
+    
+    // Legacy: also check query params for backwards compatibility
     const urlToken = searchParams.get('invite');
-    if (urlToken) return urlToken;
+    if (urlToken) {
+      // Clear from URL to prevent leakage, then use it
+      window.history.replaceState({}, document.title, '/auth');
+      return urlToken;
+    }
     
     // Check localStorage for token saved before OAuth redirect
     try {
