@@ -280,15 +280,50 @@ export function BookingModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6 mt-4">
-          {/* PO Search */}
+          {/* Order Type Toggle + Search */}
           <div className="space-y-2">
-            <Label>Link to CartonCloud PO</Label>
+            {isCartonCloudConnected && (
+              <div className="flex items-center gap-1 mb-2">
+                <Button
+                  type="button"
+                  variant={orderType === 'inbound' ? 'default' : 'outline'}
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => {
+                    setOrderType('inbound');
+                    setSelectedSO(null);
+                    setSoSearchTerm('');
+                    setSoSearchResults([]);
+                  }}
+                >
+                  <ArrowDownToLine className="w-3.5 h-3.5" />
+                  Inbound (PO)
+                </Button>
+                <Button
+                  type="button"
+                  variant={orderType === 'outbound' ? 'default' : 'outline'}
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => {
+                    setOrderType('outbound');
+                    setSelectedPO(null);
+                    setSearchTerm('');
+                    setSearchResults([]);
+                  }}
+                >
+                  <ArrowUpFromLine className="w-3.5 h-3.5" />
+                  Outbound (SO)
+                </Button>
+              </div>
+            )}
+
             {!isCartonCloudConnected ? (
               <div className="p-3 bg-muted/50 border border-border rounded-md text-sm text-muted-foreground">
-                CartonCloud is not connected. Configure it in Settings → Integration to search for Purchase Orders.
+                CartonCloud is not connected. Configure it in Settings → Integration to search for orders.
               </div>
-            ) : (
+            ) : orderType === 'inbound' ? (
               <>
+                <Label>Link to CartonCloud PO</Label>
                 <Popover open={poSearchOpen} onOpenChange={setPoSearchOpen}>
                   <PopoverTrigger asChild>
                     <Button
@@ -397,6 +432,118 @@ export function BookingModal({
                       variant="ghost"
                       size="sm"
                       onClick={() => setSelectedPO(null)}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <Label>Link to CartonCloud SO</Label>
+                <Popover open={soSearchOpen} onOpenChange={setSoSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                    >
+                      {selectedSO ? (
+                        <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4 text-accent" />
+                          <span>SO: {selectedSO.reference}</span>
+                          <span className="text-muted-foreground">- {selectedSO.customer}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Search className="w-4 h-4" />
+                          <span>Search Sales Orders...</span>
+                        </div>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput 
+                        placeholder="Type SO reference number..." 
+                        value={soSearchTerm}
+                        onValueChange={setSoSearchTerm}
+                      />
+                      <CommandList>
+                        {isSOSearchPending && (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                            <span className="ml-2 text-sm text-muted-foreground">Searching...</span>
+                          </div>
+                        )}
+                        {!isSOSearchPending && soSearchTerm.length < 2 && (
+                          <div className="py-4 text-center text-sm text-muted-foreground">
+                            Type at least 2 characters to search
+                          </div>
+                        )}
+                        {!isSOSearchPending && soSearchTerm.length >= 2 && soSearchResults.length === 0 && (
+                          <CommandEmpty>No sales orders found.</CommandEmpty>
+                        )}
+                        {soSearchResults.length > 0 && (
+                          <CommandGroup>
+                            {soSearchResults.map((so) => (
+                              <CommandItem
+                                key={so.id}
+                                onSelect={() => {
+                                  setSelectedSO(so as CartonCloudSO);
+                                  setSoSearchOpen(false);
+                                  if (!title) {
+                                    setTitle(`${so.customer} Shipment`);
+                                  }
+                                }}
+                                className="cursor-pointer"
+                              >
+                                <div className="flex flex-col gap-1 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-medium">SO: {so.reference}</span>
+                                    <Badge variant={getStatusBadgeVariant(so.status)} className="text-xs">
+                                      {so.status}
+                                    </Badge>
+                                  </div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {so.customer} • {so.warehouseName}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {so.itemCount} line{so.itemCount !== 1 ? 's' : ''}
+                                    {so.deliveryDate && ` • Delivery: ${so.deliveryDate}`}
+                                  </div>
+                                </div>
+                                <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {selectedSO && (
+                  <div className="flex items-center justify-between p-3 bg-accent/5 border border-accent/20 rounded-md">
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">SO: {selectedSO.reference}</span>
+                        <Badge variant={getStatusBadgeVariant(selectedSO.status)} className="text-xs">
+                          {selectedSO.status}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {selectedSO.customer} • {selectedSO.warehouseName}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {selectedSO.itemCount} line{selectedSO.itemCount !== 1 ? 's' : ''}
+                        {selectedSO.deliveryDate && ` • Delivery: ${selectedSO.deliveryDate}`}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedSO(null)}
                       className="text-muted-foreground hover:text-destructive"
                     >
                       <X className="w-4 h-4" />
