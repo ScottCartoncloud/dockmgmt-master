@@ -195,7 +195,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`[AUDIT] Sending invite email to ${email} for tenant ${tenant.name} by user ${user.id}`);
 
     // Construct signup URL server-side using trusted APP_BASE_URL (trimmed)
-    const signupUrl = `${baseUrl}/auth?invite=${inviteToken}`;
+    const signupUrl = `${baseUrl}/auth#invite=${inviteToken}`;
     
     // CartonCloud logo - hosted from our own public folder for reliable email rendering
     const logoUrl = `${baseUrl}/images/cartoncloud-logo-white.png`;
