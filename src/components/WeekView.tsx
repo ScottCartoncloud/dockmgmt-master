@@ -4,7 +4,7 @@ import { DraggableBookingCard } from './DraggableBookingCard';
 import { format, startOfWeek, addDays, isSameDay, getDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useRef, DragEvent, useMemo, useCallback } from 'react';
-import { useDockDoors } from '@/hooks/useDockDoors';
+import { useDockDoors, DockDoor } from '@/hooks/useDockDoors';
 import { calculateBookingLayout, getBookingLayoutStyle } from '@/lib/bookingLayout';
 import {
   HOUR_HEIGHT,
