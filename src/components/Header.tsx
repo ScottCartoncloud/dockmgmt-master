@@ -116,6 +116,10 @@ export function Header() {
                 <Truck className="w-4 h-4" />
                 Carrier Management
               </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=warehouses')}>
+                <Warehouse className="w-4 h-4" />
+                Warehouse Management
+              </DropdownMenuItem>
               <DropdownMenuItem className="gap-2" onClick={() => navigate('/settings?tab=integration')}>
                 <Link2 className="w-4 h-4" />
                 CartonCloud Integration
