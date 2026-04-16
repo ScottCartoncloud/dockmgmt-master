@@ -279,7 +279,7 @@ export function DockConfiguration() {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting || !formData.name.trim()}>
+              <Button type="submit" disabled={isSubmitting || !formData.name.trim() || !formData.warehouse_id}>
                 {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 {editingDock ? 'Save Changes' : 'Create Dock'}
               </Button>
