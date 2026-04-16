@@ -344,7 +344,7 @@ export function DayView({
             onDrop={handleDrop}
           >
             {activeDocks.map((dock, dockIndex) => {
-              const dockBookings = getBookingsForDock(dock);
+              const dockBookings = getBookingsForDock(dock.id);
               
               return (
                 <div
