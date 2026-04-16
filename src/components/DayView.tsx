@@ -294,7 +294,7 @@ export function DayView({
             {activeDocks.map((dock) => (
               <div
                 key={dock.id}
-                className="flex-1 p-3 border-r border-border last:border-r-0 text-center"
+                className="flex-1 p-3 border-r border-border text-center"
                 style={{ minWidth: MIN_DOCK_WIDTH }}
               >
                 <div className="flex items-center justify-center gap-2">
@@ -306,6 +306,19 @@ export function DayView({
                 </div>
               </div>
             ))}
+            
+            {/* Unassigned column header */}
+            {unassignedBookings.length > 0 && (
+              <div
+                className="flex-1 p-3 text-center"
+                style={{ minWidth: MIN_DOCK_WIDTH }}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-muted-foreground/40" />
+                  <span className="font-medium text-muted-foreground">Unassigned</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
