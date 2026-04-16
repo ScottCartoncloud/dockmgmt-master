@@ -438,27 +438,72 @@ export function DayView({
                 </div>
               );
             })}
+
+            {/* Unassigned bookings column */}
+            {unassignedBookings.length > 0 && (
+              <div
+                className="flex-1 relative border-l border-border"
+                style={{ minWidth: MIN_DOCK_WIDTH }}
+              >
+                {/* Hour grid lines */}
+                {HOURS.map(({ hour }) => {
+                  const isWorking = isHourInWorkingRange(hour) && isWorkingDay;
+                  return (
+                    <div
+                      key={hour}
+                      className={cn(
+                        'border-b border-border transition-colors relative',
+                        isCurrentHour(hour) && 'bg-accent/5',
+                        !isWorking && 'bg-muted/40 cursor-not-allowed',
+                        isWorking && 'cursor-pointer hover:bg-muted/50'
+                      )}
+                      style={{ height: HOUR_HEIGHT }}
+                      onClick={() => isWorking && onTimeSlotClick(date, hour)}
+                    >
+                      <div className="absolute left-0 right-0 top-[25%] border-t border-dashed border-border/40" />
+                      <div className="absolute left-0 right-0 top-[50%] border-t border-dotted border-border/60" />
+                      <div className="absolute left-0 right-0 top-[75%] border-t border-dashed border-border/40" />
+                    </div>
+                  );
+                })}
+
+                {/* Unassigned bookings */}
+                <div className="absolute inset-0 pointer-events-none">
+                  {unassignedBookings.map((booking) => {
+                    const style = getBookingPositionStyle(booking, START_HOUR);
+                    const layout = dockLayouts.get('__unassigned__')?.get(booking.id);
+                    const layoutStyle = layout
+                      ? getBookingLayoutStyle(layout.column, layout.totalColumns, 4)
+                      : { left: '4px', right: '4px' };
+
+                    return (
+                      <div
+                        key={booking.id}
+                        className="absolute pointer-events-auto z-10"
+                        style={{
+                          top: style.top,
+                          height: style.height,
+                          left: layoutStyle.left,
+                          right: layoutStyle.right,
+                        }}
+                      >
+                        <DraggableBookingCard
+                          booking={booking}
+                          onClick={onBookingClick}
+                          onDragStart={handleDragStart}
+                          onDragEnd={handleDragEnd}
+                          onResize={onBookingResize}
+                          dockColor="#9CA3AF"
+                          showDockBadge={false}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Unassigned bookings indicator */}
-        {unassignedBookings.length > 0 && (
-          <div className="sticky bottom-0 bg-warning/10 border-t border-warning/30 p-3">
-            <div className="text-sm text-warning-foreground">
-              <span className="font-medium">{unassignedBookings.length} booking(s)</span> without assigned dock:
-              {unassignedBookings.slice(0, 3).map(b => (
-                <button
-                  key={b.id}
-                  onClick={() => onBookingClick(b)}
-                  className="ml-2 underline hover:no-underline"
-                >
-                  {b.title}
-                </button>
-              ))}
-              {unassignedBookings.length > 3 && <span className="ml-1">and {unassignedBookings.length - 3} more...</span>}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
