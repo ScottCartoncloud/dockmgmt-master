@@ -241,6 +241,7 @@ const Index = () => {
               <DayView
                 date={currentDate}
                 bookings={filteredBookings}
+                dockDoors={filteredDocks}
                 onTimeSlotClick={handleTimeSlotClick}
                 onBookingClick={handleBookingClick}
                 onBookingMove={handleBookingMove}
@@ -250,6 +251,7 @@ const Index = () => {
               <WeekView
                 date={currentDate}
                 bookings={filteredBookings}
+                dockDoors={filteredDocks}
                 onTimeSlotClick={handleTimeSlotClick}
                 onBookingClick={handleBookingClick}
                 onBookingMove={handleBookingMove}

@@ -33,6 +33,7 @@ interface DayViewProps {
   onBookingClick: (booking: CrossDockBooking) => void;
   onBookingMove?: (booking: CrossDockBooking, newDate: Date, newHour: number, offsetMinutes: number, newDockId?: string) => void;
   onBookingResize?: (booking: CrossDockBooking, newEndTime: string) => void;
+  dockDoors?: DockDoor[];
 }
 
 export function DayView({ 
@@ -41,9 +42,11 @@ export function DayView({
   onTimeSlotClick, 
   onBookingClick,
   onBookingMove,
-  onBookingResize
+  onBookingResize,
+  dockDoors: dockDoorsProp
 }: DayViewProps) {
-  const { data: dockDoors, isLoading: isLoadingDocks } = useDockDoors();
+  const { data: dockDoorsFromHook, isLoading: isLoadingDocks } = useDockDoors();
+  const dockDoors = dockDoorsProp ?? dockDoorsFromHook;
   const { isHourWorking, isDayWorking, getHoursForDay } = useWorkingHours();
   
   // Use refs to avoid re-renders during drag

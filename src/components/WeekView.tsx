@@ -30,6 +30,7 @@ interface WeekViewProps {
   onBookingClick: (booking: CrossDockBooking) => void;
   onBookingMove?: (booking: CrossDockBooking, newDate: Date, newHour: number, offsetMinutes: number) => void;
   onBookingResize?: (booking: CrossDockBooking, newEndTime: string) => void;
+  dockDoors?: DockDoor[];
 }
 
 export function WeekView({ 
@@ -38,9 +39,11 @@ export function WeekView({
   onTimeSlotClick, 
   onBookingClick,
   onBookingMove,
-  onBookingResize
+  onBookingResize,
+  dockDoors: dockDoorsProp
 }: WeekViewProps) {
-  const { data: dockDoors } = useDockDoors();
+  const { data: dockDoorsFromHook } = useDockDoors();
+  const dockDoors = dockDoorsProp ?? dockDoorsFromHook;
   const { isHourWorking, isDayWorking } = useWorkingHours();
   
   // Use refs for drag state to avoid re-renders
