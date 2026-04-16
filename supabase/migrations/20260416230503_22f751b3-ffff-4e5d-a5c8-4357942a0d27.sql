@@ -1,0 +1,1 @@
+GRANT SELECT ON public.cartoncloud_settings TO authenticated;
