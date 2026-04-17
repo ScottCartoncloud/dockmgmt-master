@@ -94,9 +94,19 @@ export default function Auth() {
     }
   };
 
-  // Check for invite token and fetch info
+  // Check for invite token (from hash or query) and fetch info
   useEffect(() => {
-    const inviteToken = searchParams.get('invite');
+    // Read from hash first (current email format: /auth#invite=<token>),
+    // fall back to query string (legacy format: /auth?invite=<token>)
+    let inviteToken: string | null = null;
+    const hash = window.location.hash;
+    if (hash) {
+      const hashParams = new URLSearchParams(hash.slice(1));
+      inviteToken = hashParams.get('invite');
+    }
+    if (!inviteToken) {
+      inviteToken = searchParams.get('invite');
+    }
 
     if (!inviteToken) {
       setInviteInfo(null);
