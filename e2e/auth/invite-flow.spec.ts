@@ -47,6 +47,37 @@ test.describe('Invite Flow', () => {
     await expect(page.locator('header')).toBeVisible();
   });
 
+  test('should show invite info when accessing auth with invite token in URL hash', async ({ page }) => {
+    // Email links use the hash-fragment format (/auth#invite=<token>) so the
+    // token is not sent to the server. This test guards the regression where
+    // Auth.tsx only read the query string and ignored the hash.
+    const inviteToken = process.env.TEST_INVITE_TOKEN;
+
+    if (!inviteToken) {
+      test.skip(true, 'TEST_INVITE_TOKEN not configured');
+      return;
+    }
+
+    await page.goto(`/auth#invite=${inviteToken}`);
+
+    // The signup tab should auto-activate when an invite is detected.
+    await expect(page.locator('button[role="tab"]', { hasText: 'Sign Up' })).toHaveAttribute(
+      'data-state',
+      'active',
+      { timeout: 10000 }
+    );
+
+    // Invite banner should appear with the inviting tenant name.
+    await expect(page.locator('text=/You.?ve been invited to join/i')).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Email field should be pre-filled and locked from the invite.
+    const emailInput = page.locator('input#signup-email');
+    await expect(emailInput).toBeDisabled();
+    await expect(emailInput).not.toHaveValue('');
+  });
+
   test('should show error for invalid invite token', async ({ page }) => {
     await page.goto('/auth?invite=invalid-token-12345');
     
