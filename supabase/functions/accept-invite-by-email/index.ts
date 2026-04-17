@@ -210,6 +210,22 @@ serve(async (req) => {
       });
     }
 
+    // Enroll user in tenant (user_tenants drives RLS via is_user_in_tenant)
+    const { error: enrollError } = await admin
+      .from("user_tenants")
+      .upsert(
+        { user_id: user.id, tenant_id: invite.tenant_id },
+        { onConflict: "user_id,tenant_id", ignoreDuplicates: true }
+      );
+
+    if (enrollError) {
+      console.error("accept-invite-by-email: user_tenants upsert error", enrollError.message);
+      return new Response(JSON.stringify({ error: "Failed to enroll in tenant" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Mark invite accepted
     await admin
       .from("tenant_invites")
